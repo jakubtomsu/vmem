@@ -26,6 +26,8 @@ vmem_commit(ptr, 2048);
 
 // do something with the data, now you can use bytes in [0..<2048]
 
+// When you don't need the whole memory block you can free it.
+// To just mark it as unused, use `vmem_decommit` instead.
 vmem_free(ptr, size);
 ```
 

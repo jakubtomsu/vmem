@@ -39,34 +39,40 @@ extern "C" {
 // Public API
 //
 
-// Allocates (reserves but doesn't commit) a block of virtual address-space of size `num_bytes`.
+// Reserves (allocates but doesn't commit) a block of virtual address-space of size `num_bytes`.
 // The memory is zeroed.
+// Free with `vmem_free`.
 // Note: you must commit the memory before using it.
 // @param num_bytes: total size of the memory block. Will be rounded up to the page size by the system.
-VMEM_FUNC void* vmem_reserve(size_t num_bytes);
+VMEM_FUNC void* vmem_alloc(size_t num_bytes);
 
-// Frees a block of virtual memory.
-// @param ptr: a pointer to the start of the memory block. Result of `vmem_reserve`.
-// @param num_reserved_bytes: *must* be the value returned by `vmem_reserve`.
+// Frees (releases) a block of virtual memory.
+// @param ptr: a pointer to the start of the memory block. Result of `vmem_alloc`.
+// @param num_allocated_bytes: *must* be the value returned by `vmem_alloc`.
 //      It isn't used on windows, but it's required on unix platforms.
-VMEM_FUNC void vmem_release(void* ptr, size_t num_reserved_bytes);
+VMEM_FUNC void vmem_free(void* ptr, size_t num_allocated_bytes);
 
 // Commit memory pages which contain one or more bytes in [ptr...ptr+num_bytes].
 // This maps the pages to physical memory.
-// @param ptr: pointer to the pointer returned by `vmem_reserve` or shifted by [0...num_bytes].
+// Decommit with `vmem_decommit`.
+// @param ptr: pointer to the pointer returned by `vmem_alloc` or shifted by [0...num_bytes].
 // @param num_bytes: number of bytes to commit.
 VMEM_FUNC void vmem_commit(void* ptr, size_t num_bytes);
 
 // Decommits the memory pages which contain one or more bytes in [ptr...ptr+num_bytes].
 // This unmaps the pages from physical memory.
 // Note: if you want to use the memory region again, you need to use `vmem_commit`.
-// @param ptr: pointer to the pointer returned by `vmem_reserve` or shifted by [0...num_bytes].
+// @param ptr: pointer to the pointer returned by `vmem_alloc` or shifted by [0...num_bytes].
 // @param num_bytes: number of bytes to decommit.
 VMEM_FUNC void vmem_decommit(void* ptr, size_t num_bytes);
 
 // Returns the page size in number bytes.
-// Usually something like 4096.
+// Uses cached value from `vmem_query_page_size`, loaded at startup time.
 VMEM_FUNC size_t vmem_get_page_size();
+
+// Returns the page size in number bytes.
+// Usually something like 4096.
+VMEM_FUNC size_t vmem_query_page_size();
 
 // Round the `address` up to the next (or current) aligned address.
 // @param address: Memory address to align.
@@ -125,35 +131,49 @@ static inline uintptr_t vmem_align_backward(const uintptr_t address, const int a
 extern "C" {
 #endif
 
+// Cached page size.
+size_t vmem__g_page_size = vmem_query_page_size();
+
+VMEM_FUNC size_t vmem_get_page_size() {
+    return vmem__g_page_size;
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Windows implementation
 //
 #if defined(VMEM_PLATFORM_WIN32)
 
-VMEM_FUNC void* vmem_reserve(const size_t num_bytes) {
-    VMEM_ASSERT(num_bytes > 0);
+VMEM_FUNC void* vmem_alloc(const size_t num_bytes) {
+    if(num_bytes <= 0) return;
+
     LPVOID address = VirtualAlloc(NULL, (SIZE_T)num_bytes, MEM_RESERVE, PAGE_READWRITE);
     // Note: memory is initialized to zero.
     return address;
 }
 
-VMEM_FUNC void vmem_release(void* ptr, const size_t num_reserved_bytes) {
+VMEM_FUNC void vmem_free(void* ptr, const size_t num_allocated_bytes) {
     VMEM_ASSERT(ptr != 0);
-    VMEM_ASSERT(num_reserved_bytes > 0);
-    VMEM_UNUSED(num_reserved_bytes);
+    VMEM_ASSERT(num_allocated_bytes > 0);
+    VMEM_UNUSED(num_allocated_bytes);
+
     VirtualFree(ptr, 0, MEM_RELEASE);
 }
 
 VMEM_FUNC void vmem_commit(void* ptr, const size_t num_bytes) {
     VMEM_ASSERT(ptr != 0);
+    if(num_bytes <= 0) return;
+
     VirtualAlloc(ptr, num_bytes, MEM_COMMIT, PAGE_READWRITE);
 }
 
 VMEM_FUNC void vmem_decommit(void* ptr, const size_t num_bytes) {
+    VMEM_ASSERT(ptr != 0);
+    if(num_bytes <= 0) return;
+
     VirtualFree(ptr, num_bytes, MEM_DECOMMIT);
 }
 
-VMEM_FUNC size_t vmem_get_page_size() {
+VMEM_FUNC size_t vmem_query_page_size() {
     SYSTEM_INFO system_info = {};
     GetSystemInfo(&system_info);
     return system_info.dwPageSize;
@@ -164,7 +184,9 @@ VMEM_FUNC size_t vmem_get_page_size() {
 //
 #elif defined(VMEM_PLATFORM_LINUX)
 
-VMEM_FUNC void* vmem_reserve(const size_t num_bytes) {
+VMEM_FUNC void* vmem_alloc(const size_t num_bytes) {
+    if(num_bytes <= 0) return;
+
     const int prot = PROT_READ | PROT_WRITE;
     const int flags = MAP_PRIVATE | MAP_ANONYMOUS;
     // Note: memory is always initialized to zero when using MAP_ANONYMOUS.
@@ -173,25 +195,35 @@ VMEM_FUNC void* vmem_reserve(const size_t num_bytes) {
     return result;
 }
 
-VMEM_FUNC void vmem_release(void* ptr, const size_t num_reserved_bytes) {
+VMEM_FUNC void vmem_free(void* ptr, const size_t num_allocated_bytes) {
+    VMEM_ASSERT(ptr != 0);
+    VMEM_ASSERT(num_allocated_bytes > 0);
+    VMEM_UNUSED(num_allocated_bytes);
+
     // https://man7.org/linux/man-pages/man3/munmap.3p.html
-    const int result = munmap(ptr, num_reserved_bytes);
+    const int result = munmap(ptr, num_allocated_bytes);
     VMEM_ASSERT(result == 0);
 }
 
 VMEM_FUNC void vmem_commit(void* ptr, const size_t num_bytes) {
-    // This call is ignored, because on linux the pages are created in a reserved state
+    VMEM_ASSERT(ptr != 0);
+    if(num_bytes <= 0) return;
+
+    // This call is ignored, because on linux the pages are created in a allocd state
     // and automatically commited on the first write.
     VMEM_UNUSED(ptr);
     VMEM_UNUSED(num_bytes);
 }
 
 VMEM_FUNC void vmem_decommit(void* ptr, const size_t num_bytes) {
+    VMEM_ASSERT(ptr != 0);
+    if(num_bytes <= 0) return;
+
     const int result = madvise(ptr, num_bytes, MADV_DONTNEED);
     VMEM_ASSERT(result == 0);
 }
 
-VMEM_FUNC size_t vmem_get_page_size() {
+VMEM_FUNC size_t vmem_query_page_size() {
     return (size_t)sysconf(_SC_PAGESIZE);
 }
 
@@ -226,7 +258,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ------------------------------------------------------------------------------
 ALTERNATIVE B - Public Domain (www.unlicense.org)
-This is free and unencumbered software released into the public domain.
+This is free and unencumbered software freed into the public domain.
 Anyone is free to copy, modify, publish, use, compile, sell, or distribute this
 software, either in source code form or as a compiled binary, for any purpose,
 commercial or non-commercial, and by any means.

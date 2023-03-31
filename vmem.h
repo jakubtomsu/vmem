@@ -39,8 +39,9 @@ extern "C" {
 // Public API
 //
 
-// Allocates (reserves but doesn't commit) a block of virtual address-space of size 'num_bytes'.
+// Allocates (reserves but doesn't commit) a block of virtual address-space of size `num_bytes`.
 // The memory is zeroed.
+// Note: you must commit the memory before using it.
 // @param num_bytes: total size of the memory block. Will be rounded up to the page size by the system.
 VMEM_FUNC void* vmem_reserve(size_t num_bytes);
 
@@ -52,14 +53,13 @@ VMEM_FUNC void vmem_release(void* ptr, size_t num_reserved_bytes);
 
 // Commit memory pages which contain one or more bytes in [ptr...ptr+num_bytes].
 // This maps the pages to physical memory.
-// NOTE: you must commit the memory before using it.
 // @param ptr: pointer to the pointer returned by `vmem_reserve` or shifted by [0...num_bytes].
 // @param num_bytes: number of bytes to commit.
 VMEM_FUNC void vmem_commit(void* ptr, size_t num_bytes);
 
 // Decommits the memory pages which contain one or more bytes in [ptr...ptr+num_bytes].
 // This unmaps the pages from physical memory.
-// NOTE: if you want to use the memory region again, you need to use `vmem_commit`.
+// Note: if you want to use the memory region again, you need to use `vmem_commit`.
 // @param ptr: pointer to the pointer returned by `vmem_reserve` or shifted by [0...num_bytes].
 // @param num_bytes: number of bytes to decommit.
 VMEM_FUNC void vmem_decommit(void* ptr, size_t num_bytes);

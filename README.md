@@ -30,9 +30,7 @@ vmem_release(ptr, size);
 ```
 
 ## Public API
-```c
-void* vmem_reserve(size_t num_bytes)
-```
+### vmem_reserve
 Allocates (reserves but doesn't commit) a block of virtual address-space of size `num_bytes`.
 Note: memory is initialized to zero.
 Note: you must commit the memory before using it.

@@ -34,35 +34,24 @@ vmem_release(ptr, size);
 Allocates (reserves but doesn't commit) a block of virtual address-space of size `num_bytes`.
 Note: memory is initialized to zero.
 Note: you must commit the memory before using it.
-- `num_bytes`: total size of the memory block. Will be rounded up to the page size by the system.
 
-### void vmem_release(void* ptr, size_t num_reserved_bytes)
+### vmem_release
 Frees a block of virtual memory.
-- `ptr`: a pointer to the start of the memory block. Result of `vmem_reserve`.
-- `num_reserved_bytes`: *must* be the value returned by `vmem_reserve`. It isn't used on windows, but it's required on unix platforms.
 
-### void vmem_commit(void* ptr, size_t num_bytes)
+### vmem_commit
 Commit memory pages which contain one or more bytes in `[ptr...ptr+num_bytes]`.
 This maps the pages to physical memory.
-- `ptr`: pointer to the pointer returned by `vmem_reserve` or shifted by `[0...num_bytes]`.
-- `num_bytes`: number of bytes to commit.
 
-### void vmem_decommit(void* ptr, size_t num_bytes)
+### vmem_decommit
 Decommits the memory pages which contain one or more bytes in `[ptr...ptr+num_bytes]`.
 This unmaps the pages from physical memory.
 Note: if you want to use the memory region again, you need to use `vmem_commit`.
-- `ptr`: pointer to the pointer returned by `vmem_reserve` or shifted by `[0...num_bytes]`.
-- `num_bytes`: number of bytes to decommit.
 
-### size_t vmem_get_page_size()
+### vmem_get_page_size
 Returns the page size (allocation granularity) in number bytes. Usually something like 4096.
 
-### uintptr_t vmem_align_forward(const uintptr_t address, const int align)
+### vmem_align_forward
 Round an address up to the next (or current) aligned address.
-- `address`: Memory address to align.
-- `align`: Address alignment. Must be a power of 2 and greater than 0.
 
-### uintptr_t vmem_align_backward(const uintptr_t address, const int align)
+### vmem_align_backward
 Round the `address` down to the previous (or current) aligned address.
-- `address`: Memory address to align.
-- `align`: Address alignment. Must be a power of 2 and greater than 0.

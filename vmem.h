@@ -120,6 +120,7 @@ static inline uintptr_t vmem_align_backward(const uintptr_t address, const int a
 #include <stdint.h>
 #include <stddef.h>
 #if defined(VMEM_PLATFORM_WIN32)
+#define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #elif defined(VMEM_PLATFORM_LINUX)
@@ -144,7 +145,7 @@ VMEM_FUNC size_t vmem_get_page_size() {
 #if defined(VMEM_PLATFORM_WIN32)
 
 VMEM_FUNC void* vmem_alloc(const size_t num_bytes) {
-    if(num_bytes <= 0) return;
+    if(num_bytes <= 0) return 0;
 
     LPVOID address = VirtualAlloc(NULL, (SIZE_T)num_bytes, MEM_RESERVE, PAGE_READWRITE);
     // Note: memory is initialized to zero.

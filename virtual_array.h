@@ -3,6 +3,9 @@
 #pragma once
 #include "vmem.h"
 
+// Address-stable array which allocates virtual memory directly. Well suited for large arrays (10KB+ etc.)
+// Never reallocates and copies the memory.
+// Uses only the memory which it needs, this means the `virtual_alloc_bytes` parameter in `init` can be 10GB if you want.
 template<typename T>
 struct VirtualArray {
     T* items;

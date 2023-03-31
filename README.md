@@ -20,13 +20,13 @@ And then you can use the public API. For example:
 ```c
 const int size = 1024 * 1024;
 // Allocate a block of virtual addresses. Note: you can't use this memory *yet*.
-uint8_t* ptr = vmem_reserve(size);
+uint8_t* ptr = vmem_alloc(size);
 // Mark some memory as ready to use.
 vmem_commit(ptr, 2048);
 
 // do something with the data, now you can use bytes in [0..<2048]
 
-vmem_release(ptr, size);
+vmem_free(ptr, size);
 ```
 
 You can find more example code in [vmem_test.cpp](vmem_test.cpp), but currently it's a very simple example.
@@ -41,9 +41,9 @@ Game consoles aren't supported, you will need to implement the platform backends
 
 ## Public API
 ### Main functions
-`vmem_reserve`: Allocates a block of memory initialized to zero. You must use `vmem_commit` to use the memory.
+`vmem_alloc`: Allocates a block of memory initialized to zero. You must use `vmem_commit` to use the memory.
 
-`vmem_release`: Frees a block of virtual memory.
+`vmem_free`: Frees a block of virtual memory.
 
 `vmem_commit`: Marks the memory for usage. This maps pages to physical memory.
 

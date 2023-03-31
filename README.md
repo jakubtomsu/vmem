@@ -30,13 +30,12 @@ vmem_release(ptr, size);
 ```
 
 ## Public API
-### void* vmem_reserve(size_t num_bytes)
+```c
+void* vmem_reserve(size_t num_bytes)
+```
 Allocates (reserves but doesn't commit) a block of virtual address-space of size `num_bytes`.
-
 Note: memory is initialized to zero.
-
 Note: you must commit the memory before using it.
-
 - `num_bytes`: total size of the memory block. Will be rounded up to the page size by the system.
 
 ### void vmem_release(void* ptr, size_t num_reserved_bytes)
@@ -52,17 +51,13 @@ This maps the pages to physical memory.
 
 ### void vmem_decommit(void* ptr, size_t num_bytes)
 Decommits the memory pages which contain one or more bytes in `[ptr...ptr+num_bytes]`.
-
 This unmaps the pages from physical memory.
-
 Note: if you want to use the memory region again, you need to use `vmem_commit`.
 - `ptr`: pointer to the pointer returned by `vmem_reserve` or shifted by `[0...num_bytes]`.
 - `num_bytes`: number of bytes to decommit.
 
 ### size_t vmem_get_page_size()
-Returns the page size (allocation granularity) in number bytes.
-
-Usually something like 4096.
+Returns the page size (allocation granularity) in number bytes. Usually something like 4096.
 
 ### uintptr_t vmem_align_forward(const uintptr_t address, const int align)
 Round an address up to the next (or current) aligned address.

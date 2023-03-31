@@ -1,12 +1,16 @@
+// This is a simple program to demonstrate the API and test it's features for correctness.
+
+#define VMEM_IMPLEMENTATION
+#include "vmem.h"
+
 #include <stdint.h>
 #include <stdio.h>
 #include <assert.h>
-#define VMEM_IMPLEMENTATION
-#include "vmem.h"
 
 #define SIZE (1024 * 1024 * 2)
 
 int main() {
+    // Basic stuff
     printf("Test basic...\n");
     {
         const size_t page_size = vmem_get_page_size();
@@ -24,7 +28,7 @@ int main() {
             mem[i] = 0xff;
         }
 
-        vmem_release(mem);
+        vmem_release(mem, SIZE);
     }
 
     // Test align functions

@@ -1,0 +1,1 @@
+# vmem.h - a lightweight cross-platform virtual memory management abstraction

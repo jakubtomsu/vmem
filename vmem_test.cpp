@@ -46,11 +46,12 @@ static void print_allocation_info_win32(void* ptr, const int num_bytes_to_scan) 
         const int region_pages = info.RegionSize / vmem_get_page_size();
 
 #if PRINT_JUST_SHORT_INFO
+        // 'p' stands for pages
         printf(
-            "\t\tbytes:[%06llib...%06llib] pages:[%04i...%04i] state:%s type:%s\n",
+            "\t\tOffs: %06llib (%04ip), Size: %06llib (%04ip), State: %s Type: %s\n",
             (intptr_t)info.BaseAddress - (intptr_t)ptr,
+            (int)(((intptr_t)info.BaseAddress - (intptr_t)ptr) / vmem_get_page_size()),
             info.RegionSize,
-            ((intptr_t)info.BaseAddress - (intptr_t)ptr) / vmem_get_page_size(),
             region_pages,
             state_str,
             type_str);
@@ -128,7 +129,7 @@ int main() {
     // Basic stuff
     printf("Test basic...\n");
     {
-        printf("Page size: %i\n", page_size);
+        printf("Page size: %llu\n", page_size);
 
         uint8_t* ptr = (uint8_t*)vmem_alloc(SIZE);
         vmem_commit(ptr, page_size * 2);

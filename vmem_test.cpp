@@ -9,6 +9,8 @@
 
 #define SIZE (1024 * 512)
 
+#define PRINT_JUST_SHORT_INFO 1
+
 #if defined(VMEM_PLATFORM_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -29,19 +31,30 @@ static void print_allocation_info_win32(void* ptr, const int num_bytes_to_scan) 
 
         const char* state_str = "<Unknown>";
         switch(info.State) {
-            case MEM_COMMIT: state_str = "MEM_COMMIT"; break;
-            case MEM_FREE: state_str = "MEM_FREE"; break;
-            case MEM_RESERVE: state_str = "MEM_RESERVE"; break;
+            case MEM_COMMIT: state_str = "COMMIT"; break;
+            case MEM_FREE: state_str = "FREE"; break;
+            case MEM_RESERVE: state_str = "RESERVE"; break;
         }
 
         const char* type_str = "<Unknown>";
         switch(info.Type) {
-            case MEM_IMAGE: type_str = "MEM_IMAGE"; break;
-            case MEM_MAPPED: type_str = "MEM_MAPPED"; break;
-            case MEM_PRIVATE: type_str = "MEM_PRIVATE"; break;
+            case MEM_IMAGE: type_str = "IMAGE"; break;
+            case MEM_MAPPED: type_str = "MAPPED"; break;
+            case MEM_PRIVATE: type_str = "PRIVATE"; break;
         }
 
         const int region_pages = info.RegionSize / vmem_get_page_size();
+
+#if PRINT_JUST_SHORT_INFO
+        printf(
+            "\t\tbytes:[%06llib...%06llib] pages:[%04i...%04i] state:%s type:%s\n",
+            (intptr_t)info.BaseAddress - (intptr_t)ptr,
+            info.RegionSize,
+            ((intptr_t)info.BaseAddress - (intptr_t)ptr) / vmem_get_page_size(),
+            region_pages,
+            state_str,
+            type_str);
+#else
         printf(
             "\tinfo at offset %llu bytes\n"
             "\t\tBaseAddress:          %p (%lli bytes from start ptr)\n"
@@ -64,13 +77,14 @@ static void print_allocation_info_win32(void* ptr, const int num_bytes_to_scan) 
             (int)info.Protect,
             (int)info.Type,
             type_str);
+#endif
 
         if(overview_len + region_pages < sizeof(overview)) {
             char overview_char = '?';
             switch(info.State) {
                 case MEM_COMMIT: overview_char = 'C'; break;
                 case MEM_FREE: overview_char = 'F'; break;
-                case MEM_RESERVE: overview_char = 'R'; break;
+                case MEM_RESERVE: overview_char = 'r'; break;
             }
             for(int j = 0; j < region_pages; j++) {
                 overview[overview_len + j] = overview_char;
@@ -87,7 +101,7 @@ static void print_allocation_info_win32(void* ptr, const int num_bytes_to_scan) 
         overview[sizeof(overview) - 1] = '\0';
     }
 
-    printf("\tPage state overview: (C: commited, F: free, R: reserved)\n\t\t%s\n", overview);
+    printf("\tPage state overview: (C: commited, F: free, r: reserved)\n\t\t%s\n", overview);
 }
 #endif
 

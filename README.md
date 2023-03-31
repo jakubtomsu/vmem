@@ -24,7 +24,7 @@ uint8_t* ptr = vmem_reserve(size);
 // Mark some memory as ready to use.
 vmem_commit(ptr, 2048);
 
-// do something with the data...
+// do something with the data, now you can use bytes in [0..<2048]
 
 vmem_release(ptr, size);
 ```

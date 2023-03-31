@@ -68,7 +68,7 @@ VMEM_FUNC void vmem_decommit(void* ptr, size_t num_bytes);
 // Usually something like 4096.
 VMEM_FUNC size_t vmem_get_page_size();
 
-// Round an address up to the next (or current) aligned address.
+// Round the `address` up to the next (or current) aligned address.
 // @param address: Memory address to align.
 // @param align: Address alignment. Must be a power of 2 and greater than 0.
 static inline uintptr_t vmem_align_forward(const uintptr_t address, const int align) {

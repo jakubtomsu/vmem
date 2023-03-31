@@ -51,7 +51,7 @@ Note: if you want to use the memory region again, you need to use `vmem_commit`.
 Returns the page size (allocation granularity) in number bytes. Usually something like 4096.
 
 ### vmem_align_forward
-Round an address up to the next (or current) aligned address.
+Round the `address` up to the next (or current) aligned address.
 
 ### vmem_align_backward
 Round the `address` down to the previous (or current) aligned address.

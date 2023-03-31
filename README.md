@@ -40,6 +40,7 @@ The plan is to also add Mac, iOS and Android.
 Game consoles aren't supported, you will need to implement the platform backends on your own.
 
 ## Public API
+### Main functions
 `vmem_reserve`: Allocates a block of memory initialized to zero. You must use `vmem_commit` to use the memory.
 
 `vmem_release`: Frees a block of virtual memory.
@@ -49,6 +50,8 @@ Game consoles aren't supported, you will need to implement the platform backends
 `vmem_decommit`: This unmaps the pages from physical memory. To use the region again, use `vmem_commit`.
 
 `vmem_get_page_size`: Returns the page size in number bytes. Usually something like 4096.
+
+### Utilities
 
 `vmem_align_forward`: Round the address up to the next (or current) aligned address.
 

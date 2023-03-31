@@ -49,7 +49,6 @@ static inline uintptr_t vmem_align_forward(const uintptr_t address, const int al
 // The `align` parameter must be a power of 2 and greater than 0.
 static inline uintptr_t vmem_align_backward(const uintptr_t address, const int align) {
     VMEM_ASSERT(align != 0 && "[vmem] Alignment cannot be zero.");
-    const uintptr_t mask = (uintptr_t)(align - 1);
     VMEM_ASSERT((align & (align - 1)) == 0 && "Alignment has to be a power of 2.");
     return address & ~(align - 1);
 }
@@ -107,12 +106,12 @@ VMEM_FUNC void vmem_decommit(void* ptr, size_t num_bytes) {
 }
 
 VMEM_FUNC size_t vmem_get_page_size() {
-    SYSTEM_INFO system_info = {};
+    SYSTEM_INFO system_info = {0};
     GetSystemInfo(&system_info);
     return system_info.dwAllocationGranularity;
 }
 
-#elif defined(VMEM_PLATFOR_LINUX)
+#elif defined(VMEM_PLATFORM_LINUX)
 #endif
 
 #ifdef __cplusplus

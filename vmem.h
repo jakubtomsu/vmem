@@ -64,7 +64,7 @@ VMEM_FUNC void vmem_commit(void* ptr, size_t num_bytes);
 // @param num_bytes: number of bytes to decommit.
 VMEM_FUNC void vmem_decommit(void* ptr, size_t num_bytes);
 
-// Returns the page size (allocation granularity) in number bytes.
+// Returns the page size in number bytes.
 // Usually something like 4096.
 VMEM_FUNC size_t vmem_get_page_size();
 

@@ -48,7 +48,7 @@ This unmaps the pages from physical memory.
 Note: if you want to use the memory region again, you need to use `vmem_commit`.
 
 ### vmem_get_page_size
-Returns the page size (allocation granularity) in number bytes. Usually something like 4096.
+Returns the page size in number bytes. Usually something like 4096.
 
 ### vmem_align_forward
 Round the `address` up to the next (or current) aligned address.

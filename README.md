@@ -29,29 +29,29 @@ vmem_commit(ptr, 2048);
 vmem_release(ptr, size);
 ```
 
+You can find more example code in [vmem_test.cpp](vmem_test.cpp), but currently it's a very simple example.
+
+## Supported platforms
+- Windows
+- Linux
+
+The plan is to also add Mac, iOS and Android.
+
+Game consoles aren't supported, you will need to implement the platform backends on your own.
+
 ## Public API
-### vmem_reserve
-Allocates (reserves but doesn't commit) a block of virtual address-space of size `num_bytes`.
-Note: memory is initialized to zero.
-Note: you must commit the memory before using it.
+`vmem_reserve`: Allocates a block of memory initialized to zero. You must use `vmem_commit` to use the memory.
 
-### vmem_release
-Frees a block of virtual memory.
+`vmem_release`: Frees a block of virtual memory.
 
-### vmem_commit
-Commit memory pages which contain one or more bytes in `[ptr...ptr+num_bytes]`.
-This maps the pages to physical memory.
+`vmem_commit`: Marks the memory for usage. This maps pages to physical memory.
 
-### vmem_decommit
-Decommits the memory pages which contain one or more bytes in `[ptr...ptr+num_bytes]`.
-This unmaps the pages from physical memory.
-Note: if you want to use the memory region again, you need to use `vmem_commit`.
+`vmem_decommit`: This unmaps the pages from physical memory. To use the region again, use `vmem_commit`.
 
-### vmem_get_page_size
-Returns the page size in number bytes. Usually something like 4096.
+`vmem_get_page_size`: Returns the page size in number bytes. Usually something like 4096.
 
-### vmem_align_forward
-Round the `address` up to the next (or current) aligned address.
+`vmem_align_forward`: Round the address up to the next (or current) aligned address.
 
-### vmem_align_backward
-Round the `address` down to the previous (or current) aligned address.
+`vmem_align_backward`: Round the address down to the previous (or current) aligned address.
+
+You can find more documentation directly in [vmem.h](vmem.h)

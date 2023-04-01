@@ -15,6 +15,20 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
+static const char* protect_mode_name_win32(const ULONG protect) {
+    switch(protect) {
+        case 0: return "<Can't access>";
+        case PAGE_NOACCESS: return "NOACCESS";
+        case PAGE_EXECUTE: return "EXECUTE";
+        case PAGE_READONLY: return "READONLY";
+        case PAGE_READWRITE: return "READWRITE";
+        case PAGE_GUARD: return "GUARD";
+        case PAGE_NOCACHE: return "NOCACHE";
+        case PAGE_WRITECOMBINE: return "WRITECOMBINE";
+    }
+    return "<Unknown>";
+}
+
 // Print allocation regions and page states.
 static void print_allocation_info_win32(void* ptr, const int num_bytes_to_scan) {
     printf("[print_allocation_info_win32] Win32 VirtualQuery info for %p\n", ptr);
@@ -43,27 +57,32 @@ static void print_allocation_info_win32(void* ptr, const int num_bytes_to_scan) 
             case MEM_PRIVATE: type_str = "PRIVATE"; break;
         }
 
+        const char* initial_protect_str = protect_mode_name_win32(info.AllocationProtect);
+        const char* protect_str = protect_mode_name_win32(info.Protect);
+
         const int region_pages = info.RegionSize / vmem_get_page_size();
 
 #if PRINT_JUST_SHORT_INFO
+        VMEM_UNUSED(initial_protect_str);
         // 'p' stands for pages
         printf(
-            "\t\tOffs: %06llib (%04ip), Size: %06llib (%04ip), State: %s Type: %s\n",
+            "\t\tOffs: %06llib (%04ip), Size: %06llib (%04ip), State: %10s, Protect: %16s, Type: %10s\n",
             (intptr_t)info.BaseAddress - (intptr_t)ptr,
             (int)(((intptr_t)info.BaseAddress - (intptr_t)ptr) / vmem_get_page_size()),
             info.RegionSize,
             region_pages,
             state_str,
+            protect_str,
             type_str);
 #else
         printf(
             "\tinfo at offset %llu bytes\n"
             "\t\tBaseAddress:          %p (%lli bytes from start ptr)\n"
             "\t\tAllocationBase:       %p\n"
-            "\t\tAllocationProtect:    %i\n"
+            "\t\tAllocationProtect:    %i (%s)\n"
             "\t\tRegionSize:           %llu bytes (%i pages)\n"
             "\t\tState:                %i (%s)\n"
-            "\t\tProtect:              %i\n"
+            "\t\tProtect:              %i (%s)\n"
             "\t\tType:                 %i (%s)\n"
             "\n",
             i,
@@ -71,11 +90,13 @@ static void print_allocation_info_win32(void* ptr, const int num_bytes_to_scan) 
             (intptr_t)info.BaseAddress - (intptr_t)ptr,
             info.AllocationBase,
             (int)info.AllocationProtect,
+            initial_protect_str,
             info.RegionSize,
             region_pages,
             (int)info.State,
             state_str,
             (int)info.Protect,
+            protect_str,
             (int)info.Type,
             type_str);
 #endif
@@ -132,7 +153,7 @@ int main() {
         printf("Page size: %llu\n", page_size);
 
         uint8_t* ptr = (uint8_t*)vmem_alloc(SIZE);
-        vmem_commit(ptr, page_size * 2, Vmem_Protect_ReadWrite);
+        vmem_commit(ptr, page_size * 2);
         for(int i = 0; i < page_size * 2; i++) {
             ptr[i] = 0xfa;
         }
@@ -153,12 +174,12 @@ int main() {
 
         print_allocation_info_win32(ptr, SIZE);
 
-        vmem_commit(ptr, vmem_get_page_size() * 4, Vmem_Protect_ReadWrite);
+        vmem_commit(ptr, vmem_get_page_size() * 4);
 
         print_allocation_info_win32(ptr, SIZE);
 
         for(int i = 0; i < 20; i++) {
-            vmem_commit(ptr + i * vmem_get_page_size() * 2, 1, Vmem_Protect_ReadWrite);
+            vmem_commit(ptr + i * vmem_get_page_size() * 2, 1);
         }
 
         print_allocation_info_win32(ptr, SIZE);
@@ -166,6 +187,37 @@ int main() {
         vmem_free(ptr, SIZE);
     }
 #endif
+
+    // Locking/unlocking
+    {
+        void* ptr = vmem_alloc(SIZE);
+
+        vmem_commit(ptr, SIZE);
+        vmem_lock(ptr, SIZE);
+        vmem_unlock(ptr, SIZE);
+
+        vmem_free(ptr, SIZE);
+    }
+
+    // Protection
+    {
+        uint64_t* ptr = (uint64_t*)vmem_alloc_protect(SIZE, Vmem_Protect_NoAccess);
+
+        vmem_commit_protect(ptr, SIZE, Vmem_Protect_ReadWrite);
+
+        for(int i = 0; i < 200; i++) {
+            ptr[i] = i;
+        }
+
+        vmem_set_protect(ptr, SIZE, Vmem_Protect_Read);
+
+        for(int i = 0; i < 200; i++) {
+            printf("%llx ", ptr[i]);
+        }
+        printf("\n");
+
+        vmem_free(ptr, SIZE);
+    }
 
     return 0;
 }

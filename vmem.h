@@ -65,13 +65,17 @@ static inline void* vmem_alloc(size_t num_bytes) {
 //  It isn't used on windows, but it's required on unix platforms.
 VMEM_FUNC void vmem_free(void* ptr, size_t num_allocated_bytes);
 
-// Commit memory pages which contain one or more bytes in [ptr...ptr+num_bytes].
+VMEM_FUNC void vmem_commit_protect(void* ptr, size_t num_bytes, Vmem_Protect protect);
+
+// Commit ReadWrite memory pages which contain one or more bytes in [ptr...ptr+num_bytes].
 // This maps the pages to physical memory.
 // Decommit with `vmem_decommit`.
 // @param ptr: pointer to the pointer returned by `vmem_alloc` or shifted by [0...num_bytes].
 // @param num_bytes: number of bytes to commit.
 // @param protect: protection mode for the newly commited pages.
-VMEM_FUNC void vmem_commit(void* ptr, size_t num_bytes, Vmem_Protect protect);
+static inline void vmem_commit(void* ptr, size_t num_bytes) {
+    return vmem_commit_protect(ptr, num_bytes, Vmem_Protect_ReadWrite);
+}
 
 // Decommits the memory pages which contain one or more bytes in [ptr...ptr+num_bytes].
 // This unmaps the pages from physical memory.
@@ -80,6 +84,7 @@ VMEM_FUNC void vmem_commit(void* ptr, size_t num_bytes, Vmem_Protect protect);
 // @param num_bytes: number of bytes to decommit.
 VMEM_FUNC void vmem_decommit(void* ptr, size_t num_bytes);
 
+// Sets protection mode for the region of pages. All of the pages must be commited.
 VMEM_FUNC void vmem_set_protect(void* ptr, size_t num_bytes, Vmem_Protect protect);
 
 // Returns the page size in number bytes.
@@ -89,6 +94,18 @@ VMEM_FUNC size_t vmem_get_page_size();
 // Returns the page size in number bytes.
 // Usually something like 4096.
 VMEM_FUNC size_t vmem_query_page_size();
+
+// Locks the specified region of the process's virtual address space into physical memory, ensuring that subsequent
+// access to the region will not incur a page fault.
+// All pages in the specified region must be commited.
+// You cannot lock pages with `Vmem_Protect_NoAccess`.
+VMEM_FUNC void vmem_lock(void* ptr, size_t num_bytes);
+
+// Unlocks a specified range of pages in the virtual address space of a process, enabling the system to swap the pages
+// out to the paging file if necessary.
+// If you try to unlock pages which aren't locked, this will fail.
+VMEM_FUNC void vmem_unlock(void* ptr, size_t num_bytes);
+
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Utilities
@@ -218,12 +235,12 @@ VMEM_FUNC void vmem_free(void* ptr, const size_t num_allocated_bytes) {
     VMEM_ASSERT(result != 0 && "[vmem_free] VirtualFree failed.");
 }
 
-VMEM_FUNC void vmem_commit(void* ptr, const size_t num_bytes, const Vmem_Protect protect) {
+VMEM_FUNC void vmem_commit_protect(void* ptr, const size_t num_bytes, const Vmem_Protect protect) {
     VMEM_ASSERT(ptr != 0);
     if(num_bytes == 0) return;
 
     const LPVOID result = VirtualAlloc(ptr, num_bytes, MEM_COMMIT, vmem__win32_protect(protect));
-    VMEM_ASSERT(result != NULL && "[vmem_commit] VirtualAlloc failed to commit memory.");
+    VMEM_ASSERT(result != NULL && "[vmem_commit_protect] VirtualAlloc failed to commit memory.");
 }
 
 VMEM_FUNC void vmem_decommit(void* ptr, const size_t num_bytes) {
@@ -248,6 +265,23 @@ VMEM_FUNC size_t vmem_query_page_size() {
     GetSystemInfo(&system_info);
     return system_info.dwPageSize;
 }
+
+VMEM_FUNC void vmem_lock(void* ptr, const size_t num_bytes) {
+    VMEM_ASSERT(ptr != 0);
+    if(num_bytes == 0) return;
+
+    const BOOL result = VirtualLock(ptr, num_bytes);
+    VMEM_ASSERT(result == 0 && "[vmem_lock] VirtualLock failed.");
+}
+
+VMEM_FUNC void vmem_unlock(void* ptr, const size_t num_bytes) {
+    VMEM_ASSERT(ptr != 0);
+    if(num_bytes == 0) return;
+
+    const BOOL result = VirtualUnlock(ptr, num_bytes);
+    VMEM_ASSERT(result == 0 && "[vmem_unlock] VirtualUnlock failed.");
+}
+
 #endif // defined(VMEM_PLATFORM_WIN32)
 
 
@@ -290,7 +324,7 @@ VMEM_FUNC void vmem_free(void* ptr, const size_t num_allocated_bytes) {
     VMEM_ASSERT(result == 0 && "[vmem_free] munmap failed.");
 }
 
-VMEM_FUNC void vmem_commit(void* ptr, const size_t num_bytes, const Vmem_Protect protect) {
+VMEM_FUNC void vmem_commit_protect(void* ptr, const size_t num_bytes, const Vmem_Protect protect) {
     VMEM_ASSERT(ptr != 0);
     if(num_bytes == 0) return;
 
@@ -318,6 +352,22 @@ VMEM_FUNC void vmem_set_protect(void* ptr, const size_t num_bytes, const Vmem_Pr
 
 VMEM_FUNC size_t vmem_query_page_size() {
     return (size_t)sysconf(_SC_PAGESIZE);
+}
+
+VMEM_FUNC void vmem_lock(void* ptr, const size_t num_bytes) {
+    VMEM_ASSERT(ptr != 0);
+    if(num_bytes == 0) return;
+
+    const int result = mlock(ptr, num_bytes);
+    VMEM_ASSERT(result != 0 && "[vmem_lock] mlock failed.");
+}
+
+VMEM_FUNC void vmem_unlock(void* ptr, const size_t num_bytes) {
+    VMEM_ASSERT(ptr != 0);
+    if(num_bytes == 0) return;
+
+    const int result = munlock(ptr, num_bytes);
+    VMEM_ASSERT(result != 0 && "[vmem_lock] munlock failed.");
 }
 #endif // defined(VMEM_PLATFORM_LINUX)
 

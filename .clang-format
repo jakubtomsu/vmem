@@ -1,6 +1,6 @@
 ---
 BasedOnStyle: Chromium
-ColumnLimit: 140
+ColumnLimit: 120
 AllowShortFunctionsOnASingleLine: false
 AllowShortLoopsOnASingleLine: false
 AllowShortIfStatementsOnASingleLine: true

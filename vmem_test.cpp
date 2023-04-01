@@ -132,7 +132,7 @@ int main() {
         printf("Page size: %llu\n", page_size);
 
         uint8_t* ptr = (uint8_t*)vmem_alloc(SIZE);
-        vmem_commit(ptr, page_size * 2);
+        vmem_commit(ptr, page_size * 2, Vmem_Protect_ReadWrite);
         for(int i = 0; i < page_size * 2; i++) {
             ptr[i] = 0xfa;
         }
@@ -153,12 +153,12 @@ int main() {
 
         print_allocation_info_win32(ptr, SIZE);
 
-        vmem_commit(ptr, vmem_get_page_size() * 4);
+        vmem_commit(ptr, vmem_get_page_size() * 4, Vmem_Protect_ReadWrite);
 
         print_allocation_info_win32(ptr, SIZE);
 
         for(int i = 0; i < 20; i++) {
-            vmem_commit(ptr + i * vmem_get_page_size() * 2, 1);
+            vmem_commit(ptr + i * vmem_get_page_size() * 2, 1, Vmem_Protect_ReadWrite);
         }
 
         print_allocation_info_win32(ptr, SIZE);

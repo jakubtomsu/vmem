@@ -27,10 +27,6 @@
 #define VMEM_ASSERT(cond) assert(cond)
 #endif
 
-#ifndef VMEM_UNUSED
-#define VMEM_UNUSED(varible) (void)(varible)
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -39,17 +35,34 @@ extern "C" {
 // Public API
 //
 
+typedef uint8_t Vmem_Protect;
+
+typedef enum Vmem_Protect_ {
+    Vmem_Protect_Invalid = 0,
+    Vmem_Protect_NoAccess,         // The memory cannot be accessed at all.
+    Vmem_Protect_Read,             // You can only read from the memory.
+    Vmem_Protect_ReadWrite,        // You can read and write to the memory. This is the most common option for memory
+                                   // allocations.
+    Vmem_Protect_Execute,          // You can only execute the memory.
+    Vmem_Protect_ExecuteRead,      // You can execute the memory and read from it.
+    Vmem_Protect_ExecuteReadWrite, // You can execute the memory and read/write to it.
+    Vmem_Protect_COUNT,
+} Vmem_Protect_;
+
 // Reserves (allocates but doesn't commit) a block of virtual address-space of size `num_bytes`.
-// The memory is zeroed.
-// Free with `vmem_free`.
-// Note: you must commit the memory before using it.
-// @param num_bytes: total size of the memory block. Will be rounded up to the page size by the system.
-VMEM_FUNC void* vmem_alloc(size_t num_bytes);
+VMEM_FUNC void* vmem_alloc_protect(size_t num_bytes, Vmem_Protect protect);
+
+// Reserves (allocates but doesn't commit) a block of virtual address-space of size `num_bytes`, in ReadWrite protection
+// mode. The memory is zeroed. Free with `vmem_free`. Note: you must commit the memory before using it.
+// @param num_bytes: total size of the memory block.
+static inline void* vmem_alloc(size_t num_bytes) {
+    return vmem_alloc_protect(num_bytes, Vmem_Protect_ReadWrite);
+}
 
 // Frees (releases) a block of virtual memory.
 // @param ptr: a pointer to the start of the memory block. Result of `vmem_alloc`.
 // @param num_allocated_bytes: *must* be the value returned by `vmem_alloc`.
-//      It isn't used on windows, but it's required on unix platforms.
+//  It isn't used on windows, but it's required on unix platforms.
 VMEM_FUNC void vmem_free(void* ptr, size_t num_allocated_bytes);
 
 // Commit memory pages which contain one or more bytes in [ptr...ptr+num_bytes].
@@ -57,7 +70,8 @@ VMEM_FUNC void vmem_free(void* ptr, size_t num_allocated_bytes);
 // Decommit with `vmem_decommit`.
 // @param ptr: pointer to the pointer returned by `vmem_alloc` or shifted by [0...num_bytes].
 // @param num_bytes: number of bytes to commit.
-VMEM_FUNC void vmem_commit(void* ptr, size_t num_bytes);
+// @param protect: protection mode for the newly commited pages.
+VMEM_FUNC void vmem_commit(void* ptr, size_t num_bytes, Vmem_Protect protect);
 
 // Decommits the memory pages which contain one or more bytes in [ptr...ptr+num_bytes].
 // This unmaps the pages from physical memory.
@@ -65,6 +79,8 @@ VMEM_FUNC void vmem_commit(void* ptr, size_t num_bytes);
 // @param ptr: pointer to the pointer returned by `vmem_alloc` or shifted by [0...num_bytes].
 // @param num_bytes: number of bytes to decommit.
 VMEM_FUNC void vmem_decommit(void* ptr, size_t num_bytes);
+
+VMEM_FUNC void vmem_set_protect(void* ptr, size_t num_bytes, Vmem_Protect protect);
 
 // Returns the page size in number bytes.
 // Uses cached value from `vmem_query_page_size`, loaded at startup time.
@@ -74,13 +90,22 @@ VMEM_FUNC size_t vmem_get_page_size();
 // Usually something like 4096.
 VMEM_FUNC size_t vmem_query_page_size();
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Utilities
+//
+
+// Returns a static string for the protection mode.
+// e.g. Vmem_Protect_ReadWrite will return "ReadWrite".
+// Unknown values return "<Unknown>".
+VMEM_FUNC const char* vmem_protect_name(Vmem_Protect protect);
+
 // Round the `address` up to the next (or current) aligned address.
 // @param address: Memory address to align.
 // @param align: Address alignment. Must be a power of 2 and greater than 0.
 static inline uintptr_t vmem_align_forward(const uintptr_t address, const int align) {
-    VMEM_ASSERT(align != 0 && "[vmem] Alignment cannot be zero.");
+    VMEM_ASSERT(align != 0 && "[vmem_align_forwards] `align` paramter cannot be zero.");
     const uintptr_t mask = (uintptr_t)(align - 1);
-    VMEM_ASSERT((align & mask) == 0 && "Alignment has to be a power of 2.");
+    VMEM_ASSERT((align & mask) == 0 && "[vmem_align_forwards] `align` parameter has to be a power of 2.");
     return (address + mask) & ~mask;
 }
 
@@ -88,8 +113,8 @@ static inline uintptr_t vmem_align_forward(const uintptr_t address, const int al
 // @param address: Memory address to align.
 // @param align: Address alignment. Must be a power of 2 and greater than 0.
 static inline uintptr_t vmem_align_backward(const uintptr_t address, const int align) {
-    VMEM_ASSERT(align != 0 && "[vmem] Alignment cannot be zero.");
-    VMEM_ASSERT((align & (align - 1)) == 0 && "Alignment has to be a power of 2.");
+    VMEM_ASSERT(align != 0 && "[vmem_align_backwards] `align` paramter cannot be zero.");
+    VMEM_ASSERT((align & (align - 1)) == 0 && "[vmem_align_backwards] `align` parameter has to be a power of 2.");
     return address & ~(align - 1);
 }
 
@@ -116,6 +141,10 @@ static inline uintptr_t vmem_align_backward(const uintptr_t address, const int a
 //
 #if defined(VMEM_IMPLEMENTATION)
 
+#ifndef VMEM_UNUSED
+#define VMEM_UNUSED(varible) (void)(varible)
+#endif
+
 // Includes
 #include <stdint.h>
 #include <stddef.h>
@@ -139,15 +168,43 @@ VMEM_FUNC size_t vmem_get_page_size() {
     return vmem__g_page_size;
 }
 
+VMEM_FUNC const char* vmem_protect_name(const Vmem_Protect protect) {
+    switch(protect) {
+        case Vmem_Protect_Invalid: return "INVALID";
+        case Vmem_Protect_NoAccess: return "NoAccess";
+        case Vmem_Protect_Read: return "Read";
+        case Vmem_Protect_ReadWrite: return "ReadWrite";
+        case Vmem_Protect_Execute: return "Execute";
+        case Vmem_Protect_ExecuteRead: return "ExecuteRead";
+        case Vmem_Protect_ExecuteReadWrite: return "ExecuteReadWrite";
+    }
+    return "<Unknown>";
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Windows implementation
 //
 #if defined(VMEM_PLATFORM_WIN32)
+static DWORD vmem__win32_protect(const Vmem_Protect protect) {
+    VMEM_ASSERT(protect != Vmem_Protect_Invalid);
+    switch(protect) {
+        case Vmem_Protect_NoAccess: return PAGE_NOACCESS;
+        case Vmem_Protect_Read: return PAGE_READONLY;
+        case Vmem_Protect_ReadWrite: return PAGE_READWRITE;
+        case Vmem_Protect_Execute: return PAGE_EXECUTE;
+        case Vmem_Protect_ExecuteRead: return PAGE_EXECUTE_READ;
+        case Vmem_Protect_ExecuteReadWrite: return PAGE_EXECUTE_READWRITE;
+    }
+    VMEM_ASSERT(0 && "[vmem__win32_protect] Unknown protect mode.");
+    // Note: what should be the behavior on invalid protection mode (if the above assertion is turned off?).
+    return PAGE_READWRITE;
+}
 
-VMEM_FUNC void* vmem_alloc(const size_t num_bytes) {
-    if(num_bytes <= 0) return 0;
+VMEM_FUNC void* vmem_alloc_protect(const size_t num_bytes, const Vmem_Protect protect) {
+    if(num_bytes == 0) return 0;
 
-    LPVOID address = VirtualAlloc(NULL, (SIZE_T)num_bytes, MEM_RESERVE, PAGE_READWRITE);
+    LPVOID address = VirtualAlloc(NULL, (SIZE_T)num_bytes, MEM_RESERVE, vmem__win32_protect(protect));
+    VMEM_ASSERT(address != NULL && "[vmem_alloc_protect] VirtualAlloc failed");
     // Note: memory is initialized to zero.
     return address;
 }
@@ -157,21 +214,33 @@ VMEM_FUNC void vmem_free(void* ptr, const size_t num_allocated_bytes) {
     VMEM_ASSERT(num_allocated_bytes > 0);
     VMEM_UNUSED(num_allocated_bytes);
 
-    VirtualFree(ptr, 0, MEM_RELEASE);
+    const BOOL result = VirtualFree(ptr, 0, MEM_RELEASE);
+    VMEM_ASSERT(result != 0 && "[vmem_free] VirtualFree failed.");
 }
 
-VMEM_FUNC void vmem_commit(void* ptr, const size_t num_bytes) {
+VMEM_FUNC void vmem_commit(void* ptr, const size_t num_bytes, const Vmem_Protect protect) {
     VMEM_ASSERT(ptr != 0);
-    if(num_bytes <= 0) return;
+    if(num_bytes == 0) return;
 
-    VirtualAlloc(ptr, num_bytes, MEM_COMMIT, PAGE_READWRITE);
+    const LPVOID result = VirtualAlloc(ptr, num_bytes, MEM_COMMIT, vmem__win32_protect(protect));
+    VMEM_ASSERT(result != NULL && "[vmem_commit] VirtualAlloc failed to commit memory.");
 }
 
 VMEM_FUNC void vmem_decommit(void* ptr, const size_t num_bytes) {
     VMEM_ASSERT(ptr != 0);
-    if(num_bytes <= 0) return;
+    if(num_bytes == 0) return;
 
-    VirtualFree(ptr, num_bytes, MEM_DECOMMIT);
+    const BOOL result = VirtualFree(ptr, num_bytes, MEM_DECOMMIT);
+    VMEM_ASSERT(result != 0 && "[vmem_decommit] VirtualFree failed.");
+}
+
+VMEM_FUNC void vmem_set_protect(void* ptr, const size_t num_bytes, const Vmem_Protect protect) {
+    VMEM_ASSERT(ptr != 0);
+    if(num_bytes == 0) return;
+
+    DWORD old_protect = 0;
+    const BOOL result = VirtualProtect(ptr, num_bytes, vmem__win32_protect(protect), &old_protect);
+    VMEM_ASSERT(result != 0 && "[vmem_set_protect] VirtualProtect failed");
 }
 
 VMEM_FUNC size_t vmem_query_page_size() {
@@ -179,56 +248,80 @@ VMEM_FUNC size_t vmem_query_page_size() {
     GetSystemInfo(&system_info);
     return system_info.dwPageSize;
 }
+#endif // defined(VMEM_PLATFORM_WIN32)
+
+
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Linux implementation
 //
-#elif defined(VMEM_PLATFORM_LINUX)
+#if defined(VMEM_PLATFORM_LINUX)
+static int vmem__linux_protect(const Vmem_Protect protect) {
+    VMEM_ASSERT(protect != Vmem_Protect_Invalid);
+    switch(protect) {
+        case Vmem_Protect_NoAccess: return PROT_NONE;
+        case Vmem_Protect_Read: return PROT_READ;
+        case Vmem_Protect_ReadWrite: return PROT_READ | PROT_WRITE;
+        case Vmem_Protect_Execute: return PROT_EXEC;
+        case Vmem_Protect_ExecuteRead: return PROT_EXEC | PROT_READ;
+        case Vmem_Protect_ExecuteReadWrite: return PROT_EXEC | PROT_READ | PROT_WRITE;
+    }
+    VMEM_ASSERT(0 && "[vmem__linux_protect] Unknown protect mode.");
+    return PROT_NONE;
+}
 
-VMEM_FUNC void* vmem_alloc(const size_t num_bytes) {
-    if(num_bytes <= 0) return;
+VMEM_FUNC void* vmem_alloc_protect(const size_t num_bytes, const Vmem_Protect protect) {
+    if(num_bytes == 0) return 0;
 
-    const int prot = PROT_READ | PROT_WRITE;
     const int flags = MAP_PRIVATE | MAP_ANONYMOUS;
+    const int prot = vmem__linux_protect(protect);
     // Note: memory is always initialized to zero when using MAP_ANONYMOUS.
     void* result = mmap(0, num_bytes, prot, flags, -1, 0);
-    assert(result != (void*)-1);
+    VMEM_ASSERT(result != (void*)-1 && "[vmem_alloc_protect] mmap failed.");
     return result;
 }
 
 VMEM_FUNC void vmem_free(void* ptr, const size_t num_allocated_bytes) {
     VMEM_ASSERT(ptr != 0);
     VMEM_ASSERT(num_allocated_bytes > 0);
-    VMEM_UNUSED(num_allocated_bytes);
 
     // https://man7.org/linux/man-pages/man3/munmap.3p.html
     const int result = munmap(ptr, num_allocated_bytes);
-    VMEM_ASSERT(result == 0);
+    VMEM_ASSERT(result == 0 && "[vmem_free] munmap failed.");
 }
 
-VMEM_FUNC void vmem_commit(void* ptr, const size_t num_bytes) {
+VMEM_FUNC void vmem_commit(void* ptr, const size_t num_bytes, const Vmem_Protect protect) {
     VMEM_ASSERT(ptr != 0);
-    if(num_bytes <= 0) return;
+    if(num_bytes == 0) return;
 
-    // This call is ignored, because on linux the pages are created in a allocd state
-    // and automatically commited on the first write.
-    VMEM_UNUSED(ptr);
-    VMEM_UNUSED(num_bytes);
+    // On linux the pages are created in a reserved state and automatically commited on the first write, so we don't
+    // need to commit anything.
+    // But for compatibility with other platforms, we have to set the protection level.
+    vmem_set_protect(ptr, num_bytes, protect);
 }
 
 VMEM_FUNC void vmem_decommit(void* ptr, const size_t num_bytes) {
     VMEM_ASSERT(ptr != 0);
-    if(num_bytes <= 0) return;
+    if(num_bytes == 0) return;
 
     const int result = madvise(ptr, num_bytes, MADV_DONTNEED);
-    VMEM_ASSERT(result == 0);
+    VMEM_ASSERT(result == 0 && "[vmem_decommit] madvise failed.");
+}
+
+VMEM_FUNC void vmem_set_protect(void* ptr, const size_t num_bytes, const Vmem_Protect protect) {
+    VMEM_ASSERT(ptr != 0);
+    if(num_bytes == 0) return;
+
+    const int result = mprotect(ptr, num_bytes, vmem__linux_protect(protect));
+    VMEM_ASSERT(result == 0 && "[vmem_set_protect] mprotect failed.");
 }
 
 VMEM_FUNC size_t vmem_query_page_size() {
     return (size_t)sysconf(_SC_PAGESIZE);
 }
+#endif // defined(VMEM_PLATFORM_LINUX)
 
-#endif
+
 
 #ifdef __cplusplus
 }

@@ -10,35 +10,7 @@
     EXPECT_FALSE(x);                 \
     printf("\tVmem test fail message: %s\n", vmem_get_failure_message())
 
-UTEST(funcs, common) {
-    const int size = 1024 * 1024;
-    void* ptr = vmem_alloc_protect(size, Vmem_Protect_ReadWrite);
-    ASSERT_TRUE(ptr);
-
-    EXPECT_FALSE(vmem_lock(ptr, 1024));
-    EXPECT_FALSE(vmem_protect(ptr, 1024, Vmem_Protect_Read));
-    EXPECT_TRUE(vmem_commit(ptr, size));
-
-    EXPECT_TRUE(vmem_free(ptr, size));
-}
-
-UTEST(funcs, protect) {
-    const int size = 1024 * 1024;
-    void* ptr = vmem_alloc(size);
-    ASSERT_TRUE(ptr);
-    EXPECT_FALSE(vmem_protect(ptr, size, Vmem_Protect_Read));
-    EXPECT_TRUE(vmem_commit(ptr, 1024));
-
-    EXPECT_TRUE(vmem_protect(ptr, 1024, Vmem_Protect_NoAccess));
-    EXPECT_TRUE(vmem_protect(ptr, 1024, Vmem_Protect_Read));
-    EXPECT_TRUE(vmem_protect(ptr, 1024, Vmem_Protect_ReadWrite));
-    EXPECT_TRUE(vmem_protect(ptr, 1024, Vmem_Protect_Execute));
-    EXPECT_TRUE(vmem_protect(ptr, 1024, Vmem_Protect_ExecuteRead));
-    EXPECT_TRUE(vmem_protect(ptr, 1024, Vmem_Protect_ExecuteReadWrite));
-    EXPECT_FALSE(vmem_protect(ptr, size, Vmem_Protect_ReadWrite));
-
-    EXPECT_TRUE(vmem_free(ptr, size));
-}
+#define MANY 100000
 
 UTEST(vmem, failure_messages) {
     EXPECT_FAIL_WITH_VMEM_MSG(vmem_alloc(0));
@@ -74,10 +46,77 @@ UTEST(vmem, failure_messages) {
     EXPECT_FAIL_WITH_VMEM_MSG(vmem_align_backward(123, 3));
 }
 
+UTEST(funcs, common) {
+    const int size = 1024 * 1024;
+    void* ptr = vmem_alloc_protect(size, Vmem_Protect_ReadWrite);
+    ASSERT_TRUE(ptr);
+
+    EXPECT_FALSE(vmem_lock(ptr, 1024));
+    EXPECT_FALSE(vmem_protect(ptr, 1024, Vmem_Protect_Read));
+    EXPECT_TRUE(vmem_commit(ptr, size));
+
+    EXPECT_TRUE(vmem_free(ptr, size));
+}
+
+UTEST(funcs, protect) {
+    const int size = 1024 * 1024;
+    void* ptr = vmem_alloc(size);
+    ASSERT_TRUE(ptr);
+    EXPECT_FALSE(vmem_protect(ptr, size, Vmem_Protect_Read));
+    EXPECT_TRUE(vmem_commit(ptr, 1024));
+
+    EXPECT_TRUE(vmem_protect(ptr, 1024, Vmem_Protect_NoAccess));
+    EXPECT_TRUE(vmem_protect(ptr, 1024, Vmem_Protect_Read));
+    EXPECT_TRUE(vmem_protect(ptr, 1024, Vmem_Protect_ReadWrite));
+    EXPECT_TRUE(vmem_protect(ptr, 1024, Vmem_Protect_Execute));
+    EXPECT_TRUE(vmem_protect(ptr, 1024, Vmem_Protect_ExecuteRead));
+    EXPECT_TRUE(vmem_protect(ptr, 1024, Vmem_Protect_ExecuteReadWrite));
+    EXPECT_FALSE(vmem_protect(ptr, size, Vmem_Protect_ReadWrite));
+
+    EXPECT_TRUE(vmem_free(ptr, size));
+}
+
 UTEST(vmem, page_size) {
     ASSERT_TRUE(vmem_get_page_size() > 0);
     ASSERT_TRUE(vmem_query_page_size() > 0);
     ASSERT_TRUE(vmem_query_page_size() == vmem_get_page_size());
+}
+
+UTEST(vmem, many_allocs_frees_perf) {
+    for(int i = 1; i < MANY; i++) {
+        void* ptr = vmem_alloc(i);
+        ASSERT_TRUE(ptr);
+        ASSERT_TRUE(vmem_free(ptr, i));
+    }
+}
+
+UTEST(vmem, many_allocs_commits_frees_perf) {
+    for(int i = 1; i < MANY; i++) {
+        void* ptr = vmem_alloc(i);
+        ASSERT_TRUE(ptr);
+        ASSERT_TRUE(vmem_commit(ptr, i));
+        ASSERT_TRUE(vmem_free(ptr, i));
+    }
+}
+
+UTEST(vmem, many_small_recommits_perf) {
+    void* ptr = vmem_alloc(MANY);
+    ASSERT_TRUE(ptr);
+    for(int i = 1; i < MANY; i++) {
+        ASSERT_TRUE(vmem_commit(ptr, i));
+    }
+    ASSERT_TRUE(vmem_free(ptr, MANY));
+}
+
+UTEST(vmem, page_commits_perf) {
+    const int num_pages = 10000;
+    const int size = num_pages * vmem_get_page_size();
+    void* ptr = vmem_alloc(size);
+    ASSERT_TRUE(ptr);
+    for(int i = 1; i < num_pages; i++) {
+        ASSERT_TRUE(vmem_commit(ptr, i * vmem_get_page_size()));
+    }
+    ASSERT_TRUE(vmem_free(ptr, size));
 }
 
 UTEST_STATE();

@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <assert.h>
 
-#define SIZE (1024 * 512)
+#define SIZE (1024 * 512) // 0.5MB
 
 #define PRINT_JUST_SHORT_INFO 1
 
@@ -30,7 +30,7 @@ static const char* protect_mode_name_win32(const ULONG protect) {
 }
 
 // Print allocation regions and page states.
-static void print_allocation_info_win32(void* ptr, const int num_bytes_to_scan) {
+static void print_allocation_info_win32(void* ptr, const size_t num_bytes_to_scan) {
     printf("[print_allocation_info_win32] Win32 VirtualQuery info for %p\n", ptr);
 
     static char overview[1024 * 8] = {};
@@ -120,6 +120,9 @@ static void print_allocation_info_win32(void* ptr, const int num_bytes_to_scan) 
     if(overview_len < sizeof(overview)) {
         overview[overview_len] = '\0';
     } else {
+        overview[sizeof(overview) - 4] = '.';
+        overview[sizeof(overview) - 3] = '.';
+        overview[sizeof(overview) - 2] = '.';
         overview[sizeof(overview) - 1] = '\0';
     }
 
@@ -217,6 +220,26 @@ int main() {
         printf("\n");
 
         vmem_free(ptr, SIZE);
+    }
+
+    // Huge allocation
+    {
+        // 100TB
+        const size_t size = 1024LLU * 1024LLU * 1024LLU * 1024LLU * 100LLU;
+        printf(
+            "Huge allocation size: %llu bytes (%lluGB, %lluTB)\n",
+            size,
+            size / (1024LLU * 1024LLU * 1024LLU),
+            size / (1024LLU * 1024LLU * 1024LLU * 1024LLU));
+        void* ptr = vmem_alloc(size);
+
+        vmem_commit(ptr, 1024 * 100);
+
+#if defined(VMEM_PLATFORM_WIN32)
+        print_allocation_info_win32(ptr, size);
+#endif
+
+        vmem_free(ptr, size);
     }
 
     return 0;

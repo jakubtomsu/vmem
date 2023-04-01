@@ -60,3 +60,15 @@ Game consoles aren't supported, you will need to implement the platform backends
 `vmem_align_backward`: Round the address down to the previous (or current) aligned address.
 
 You can find more documentation directly in [vmem.h](vmem.h)
+
+## Building tests
+```bash
+# you can replace clang with 'gcc', 'zig cc' etc.
+# Compiles fine with '-Wall -Werror'.
+clang vmem_test.cpp -o vmem_test.exe
+```
+Or in `x64 Developer Command Prompt` on windows, using MSVC:
+```bash
+cl vmem_test.cpp /Fevmem_test.exe
+```
+

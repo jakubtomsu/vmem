@@ -55,7 +55,7 @@ VMEM_FUNC void* vmem_alloc_protect(size_t num_bytes, Vmem_Protect protect);
 // Reserves (allocates but doesn't commit) a block of virtual address-space of size `num_bytes`, in ReadWrite protection
 // mode. The memory is zeroed. Free with `vmem_free`. Note: you must commit the memory before using it.
 // @param num_bytes: total size of the memory block.
-static inline void* vmem_alloc(size_t num_bytes) {
+static inline void* vmem_alloc(const size_t num_bytes) {
     return vmem_alloc_protect(num_bytes, Vmem_Protect_ReadWrite);
 }
 
@@ -73,7 +73,7 @@ VMEM_FUNC void vmem_commit_protect(void* ptr, size_t num_bytes, Vmem_Protect pro
 // @param ptr: pointer to the pointer returned by `vmem_alloc` or shifted by [0...num_bytes].
 // @param num_bytes: number of bytes to commit.
 // @param protect: protection mode for the newly commited pages.
-static inline void vmem_commit(void* ptr, size_t num_bytes) {
+static inline void vmem_commit(void* ptr, const size_t num_bytes) {
     return vmem_commit_protect(ptr, num_bytes, Vmem_Protect_ReadWrite);
 }
 

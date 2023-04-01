@@ -6,15 +6,86 @@
 #include "utest.h"
 #include <stdio.h>
 
-UTEST(foo, bar) {
-    ASSERT_TRUE(1);
-    const size_t size = 1024 * 1024 * 2;
-    void* ptr = vmem_alloc(size);
-    EXPECT_TRUE(ptr);
-    EXPECT_TRUE(vmem_free(0, size));
+#define EXPECT_FAIL_WITH_VMEM_MSG(x) \
+    EXPECT_FALSE(x);                 \
+    printf("\tVmem test fail message: %s\n", vmem_get_failure_message())
+
+UTEST(funcs, common) {
+    const int size = 1024 * 1024;
+    void* ptr = vmem_alloc_protect(size, Vmem_Protect_ReadWrite);
+    ASSERT_TRUE(ptr);
+
+    EXPECT_FALSE(vmem_lock(ptr, 1024));
+    EXPECT_FALSE(vmem_protect(ptr, 1024, Vmem_Protect_Read));
+    EXPECT_TRUE(vmem_commit(ptr, size));
+
+    EXPECT_TRUE(vmem_free(ptr, size));
 }
 
-UTEST_MAIN();
+UTEST(funcs, protect) {
+    const int size = 1024 * 1024;
+    void* ptr = vmem_alloc(size);
+    ASSERT_TRUE(ptr);
+    EXPECT_FALSE(vmem_protect(ptr, size, Vmem_Protect_Read));
+    EXPECT_TRUE(vmem_commit(ptr, 1024));
+
+    EXPECT_TRUE(vmem_protect(ptr, 1024, Vmem_Protect_NoAccess));
+    EXPECT_TRUE(vmem_protect(ptr, 1024, Vmem_Protect_Read));
+    EXPECT_TRUE(vmem_protect(ptr, 1024, Vmem_Protect_ReadWrite));
+    EXPECT_TRUE(vmem_protect(ptr, 1024, Vmem_Protect_Execute));
+    EXPECT_TRUE(vmem_protect(ptr, 1024, Vmem_Protect_ExecuteRead));
+    EXPECT_TRUE(vmem_protect(ptr, 1024, Vmem_Protect_ExecuteReadWrite));
+    EXPECT_FALSE(vmem_protect(ptr, size, Vmem_Protect_ReadWrite));
+
+    EXPECT_TRUE(vmem_free(ptr, size));
+}
+
+UTEST(vmem, failure_messages) {
+    EXPECT_FAIL_WITH_VMEM_MSG(vmem_alloc(0));
+    EXPECT_FAIL_WITH_VMEM_MSG(vmem_alloc(~0));
+
+    EXPECT_FAIL_WITH_VMEM_MSG(vmem_alloc_protect(1, Vmem_Protect_Invalid));
+    EXPECT_FAIL_WITH_VMEM_MSG(vmem_alloc_protect(1, (Vmem_Protect)12345));
+
+    EXPECT_FAIL_WITH_VMEM_MSG(vmem_free(0, 0));
+    EXPECT_FAIL_WITH_VMEM_MSG(vmem_free(0, 123));
+    EXPECT_FAIL_WITH_VMEM_MSG(vmem_free((void*)1, 0));
+    EXPECT_FAIL_WITH_VMEM_MSG(vmem_free((void*)1, 1));
+
+    EXPECT_FAIL_WITH_VMEM_MSG(vmem_lock(0, 0));
+    EXPECT_FAIL_WITH_VMEM_MSG(vmem_lock(0, 123));
+    EXPECT_FAIL_WITH_VMEM_MSG(vmem_lock((void*)1, 0));
+    EXPECT_FAIL_WITH_VMEM_MSG(vmem_lock((void*)1, 1));
+
+    EXPECT_FAIL_WITH_VMEM_MSG(vmem_unlock(0, 0));
+    EXPECT_FAIL_WITH_VMEM_MSG(vmem_unlock(0, 123));
+    EXPECT_FAIL_WITH_VMEM_MSG(vmem_unlock((void*)1, 0));
+    EXPECT_FAIL_WITH_VMEM_MSG(vmem_unlock((void*)1, 1));
+
+    EXPECT_FAIL_WITH_VMEM_MSG(vmem_protect(0, 0, Vmem_Protect_ReadWrite));
+    EXPECT_FAIL_WITH_VMEM_MSG(vmem_protect(0, 123, Vmem_Protect_ReadWrite));
+    EXPECT_FAIL_WITH_VMEM_MSG(vmem_protect((void*)1, 0, Vmem_Protect_ReadWrite));
+    EXPECT_FAIL_WITH_VMEM_MSG(vmem_protect((void*)1, 1, Vmem_Protect_ReadWrite));
+
+    EXPECT_FAIL_WITH_VMEM_MSG(vmem_align_forward(123, 0));
+    EXPECT_FAIL_WITH_VMEM_MSG(vmem_align_forward(123, 3));
+
+    EXPECT_FAIL_WITH_VMEM_MSG(vmem_align_backward(123, 0));
+    EXPECT_FAIL_WITH_VMEM_MSG(vmem_align_backward(123, 3));
+}
+
+UTEST(vmem, page_size) {
+    ASSERT_TRUE(vmem_get_page_size() > 0);
+    ASSERT_TRUE(vmem_query_page_size() > 0);
+    ASSERT_TRUE(vmem_query_page_size() == vmem_get_page_size());
+}
+
+UTEST_STATE();
+
+int main(const int argc, const char* argv[]) {
+    vmem_init();
+    return utest_main(argc, argv);
+}
 
 /*
 #include <stdint.h>

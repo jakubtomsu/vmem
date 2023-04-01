@@ -55,6 +55,12 @@ typedef enum Vmem_Protect_ {
 // Public API
 //
 
+// Call at the start of your program.
+// This exists only to cache result of `vmem_query_page_size` so you can use faster `vmem_get_page_size`,
+// so this is completely optional. If you don't call this `vmem_get_page_size` will return 0.
+// There isn't any deinit/shutdown code.
+VMEM_FUNC void vmem_init();
+
 // Reserves (allocates but doesn't commit) a block of virtual address-space of size `num_bytes`.
 // @returns 0 on failure, start address of the allocated memory block on success.
 VMEM_FUNC void* vmem_alloc_protect(Vmem_Size num_bytes, Vmem_Protect protect);
@@ -98,7 +104,7 @@ static inline Vmem_Result vmem_commit(void* ptr, const Vmem_Size num_bytes) {
 VMEM_FUNC Vmem_Result vmem_decommit(void* ptr, Vmem_Size num_bytes);
 
 // Sets protection mode for the region of pages. All of the pages must be commited.
-VMEM_FUNC Vmem_Result vmem_set_protect(void* ptr, Vmem_Size num_bytes, Vmem_Protect protect);
+VMEM_FUNC Vmem_Result vmem_protect(void* ptr, Vmem_Size num_bytes, Vmem_Protect protect);
 
 // Get page size. Uses cached value from `vmem_query_page_size`, loaded at startup time. Usually something like 4096.
 // @returns the page size in number bytes. Cannot fail.
@@ -129,7 +135,7 @@ VMEM_FUNC const char* vmem_get_failure_message();
 // Returns a static string for the protection mode.
 // e.g. Vmem_Protect_ReadWrite will return "ReadWrite".
 // Never fails - unknown values return "<Unknown>", never null pointer.
-VMEM_FUNC const char* vmem_protect_name(Vmem_Protect protect);
+VMEM_FUNC const char* vmem_get_protect_name(Vmem_Protect protect);
 
 // Round the `address` up to the next (or current) aligned address.
 // @param address: Memory address to align.
@@ -206,7 +212,11 @@ extern "C" {
 
 // Cached page size.
 // Warning: this won't compile in C mode! TODO
-static Vmem_Size vmem__g_page_size = vmem_query_page_size();
+static Vmem_Size vmem__g_page_size = 0;
+
+VMEM_FUNC void vmem_init() {
+    vmem__g_page_size = vmem_query_page_size();
+}
 
 #if !defined(VMEM_NO_ERROR_MESSAGES)
 static char vmem__g_error_buf[1024] = {};
@@ -242,7 +252,7 @@ VMEM_FUNC Vmem_Size vmem_get_page_size() {
     return vmem__g_page_size;
 }
 
-VMEM_FUNC const char* vmem_protect_name(const Vmem_Protect protect) {
+VMEM_FUNC const char* vmem_get_protect_name(const Vmem_Protect protect) {
     switch(protect) {
         case Vmem_Protect_Invalid: return "INVALID";
         case Vmem_Protect_NoAccess: return "NoAccess";
@@ -285,6 +295,9 @@ static void vmem__write_win32_failure_message() {
 
     if(result == 0) {
         vmem__write_failure_message("[vmem__win32_last_error] Failed to format Win32 error.");
+    } else {
+        // Rewrite the last \n to zero
+        vmem__g_error_buf[(int)result - 1] = '\0';
     }
 }
 #endif
@@ -332,7 +345,7 @@ VMEM_FUNC Vmem_Result vmem_decommit(void* ptr, const Vmem_Size num_bytes) {
     return Vmem_Result_Success;
 }
 
-VMEM_FUNC Vmem_Result vmem_set_protect(void* ptr, const Vmem_Size num_bytes, const Vmem_Protect protect) {
+VMEM_FUNC Vmem_Result vmem_protect(void* ptr, const Vmem_Size num_bytes, const Vmem_Protect protect) {
     VMEM_FAIL_IF(ptr == 0, vmem__write_failure_message("Ptr cannot be null."));
     VMEM_FAIL_IF(num_bytes == 0, vmem__write_failure_message("Size (num_bytes) cannot be null."));
 
@@ -425,7 +438,7 @@ VMEM_FUNC Vmem_Result vmem_commit_protect(void* ptr, const Vmem_Size num_bytes, 
     // On linux the pages are created in a reserved state and automatically commited on the first write, so we don't
     // need to commit anything.
     // But for compatibility with other platforms, we have to set the protection level.
-    vmem_set_protect(ptr, num_bytes, protect);
+    vmem_protect(ptr, num_bytes, protect);
     return Vmem_Result_Success;
 }
 
@@ -438,7 +451,7 @@ VMEM_FUNC Vmem_Result vmem_decommit(void* ptr, const Vmem_Size num_bytes) {
     return Vmem_Result_Success;
 }
 
-VMEM_FUNC Vmem_Result vmem_set_protect(void* ptr, const Vmem_Size num_bytes, const Vmem_Protect protect) {
+VMEM_FUNC Vmem_Result vmem_protect(void* ptr, const Vmem_Size num_bytes, const Vmem_Protect protect) {
     VMEM_FAIL_IF(ptr == 0, vmem__write_failure_message("Ptr cannot be null."));
     VMEM_FAIL_IF(num_bytes == 0, vmem__write_failure_message("Size (num_bytes) cannot be null."));
 

@@ -31,7 +31,7 @@ vmem_commit(ptr, 2048);
 vmem_free(ptr, size);
 ```
 
-You can find more example code in [vmem_test.cpp](vmem_test.cpp), but currently it's a very simple example.
+You can find more example code in [vmem_test.cpp](tests/vmem_test.cpp), but currently it's a very simple example.
 
 ## Supported platforms
 - Windows

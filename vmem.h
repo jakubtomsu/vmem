@@ -173,7 +173,6 @@ VMEM_FUNC uintptr_t vmem_align_backward(const uintptr_t address, const int align
 } // extern "C"
 #endif
 
-#if !defined(VMEM_NO_AUTO_PLATFORM)
 #if defined(_WIN32)
 #define VMEM_PLATFORM_WIN32
 #elif defined(__linux__) || defined(__unix__)
@@ -181,7 +180,6 @@ VMEM_FUNC uintptr_t vmem_align_backward(const uintptr_t address, const int align
 #else
 #error "[vmem] Unknown platform."
 #endif
-#endif // !defined(VMEM_NO_AUTO_PLATFORM)
 
 #endif // !defined(VMEM_H_INCLUDED)
 

@@ -1,5 +1,5 @@
-# `vmem.h` - cross-platform virtual memory API
-This is a simple [STB-style](https://github.com/nothings/stb/blob/master/docs/stb_howto.txt) cross-platform library for virtual memory management written in C. You can use this to implement arenas and other memory allocators, which work directly with virtual address space.
+# 💾 vmem.h
+A simple [STB-style](https://github.com/nothings/stb/blob/master/docs/stb_howto.txt) cross-platform library for virtual memory management written in C. You can use this to implement arenas and other memory allocators, which work directly with virtual address space.
 
 # Documentation
 ## How to use

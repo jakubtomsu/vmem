@@ -75,5 +75,7 @@ int main() {
 ```
 
 ## Compile-time options
-
-## Tests
+| #define | Description |
+| --- | --- |
+| VMEM_IMPLEMENTATION | Instantiate the library implementation in the current source file. |
+| VMEM_FUNC | Specifiers for all API functions. E.g. you can mark all functions static with `#define VMEM_FUNC static` |

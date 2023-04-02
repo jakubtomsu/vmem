@@ -75,10 +75,10 @@ int main() {
 ```
 
 ## Compile-time options
-| #define | Description |
-| --- | --- |
-| VMEM_IMPLEMENTATION | Instantiate the library implementation in the current source file. |
-| VMEM_FUNC | Specifiers for all API functions. E.g. you can mark all functions static with `#define VMEM_FUNC static` |
-| VMEM_ON_ERROR(opt_string) | Called when an error is encountered. By default this just calls `assert(0)`. You can disable it with `#define VMEM_ON_ERROR(opt_string)`. |
-| VMEM_NO_ERROR_MESSAGES | Disables all error messages. When you call `vmem_get_error_message` it gives you just `<Error messages disabled>`. |
-| VMEM_NO_ERROR_CHECKING | Completely disables ***all*** error checking. This might be very unsafe. |
+#define | Description
+======= | ===========
+VMEM_IMPLEMENTATION       | Instantiate the library implementation in the current source file.
+VMEM_FUNC                 | Specifiers for all API functions. E.g. you can mark all functions static with `#define VMEM_FUNC static`
+VMEM_ON_ERROR(opt_string) | Called when an error is encountered. By default this just calls `assert(0)`. You can disable it with `#define VMEM_ON_ERROR(opt_string)`.
+VMEM_NO_ERROR_MESSAGES    | Disables all error messages. When you call `vmem_get_error_message` it gives you just `<Error messages disabled>`.
+VMEM_NO_ERROR_CHECKING    | Completely disables ***all*** error checking. This might be very unsafe.

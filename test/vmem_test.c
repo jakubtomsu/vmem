@@ -1,49 +1,50 @@
 // This is a simple program to demonstrate the API and test it's features for correctness.
 
-#define VMEM_ON_FAILURE(opt_string) // Ignore for tests
+#define VMEM_NO_ERROR_MESSAGES
+#define VMEM_ON_ERROR(opt_string) // Ignore for tests
 #define VMEM_IMPLEMENTATION
 #include "../vmem.h"
 #include "utest.h"
 #include <stdio.h>
 
-#define EXPECT_FAIL_WITH_VMEM_MSG(x) \
-    EXPECT_FALSE(x);                 \
-    printf("\tVmem fail message: %s\n", vmem_get_failure_message())
+#define EXPECT_ERROR_WITH_VMEM_MSG(x) \
+    EXPECT_FALSE(x);                  \
+    printf("\tVmem error message: %s\n", vmem_get_error_message())
 
 #define MANY 100000
 
-UTEST(vmem, failure_messages) {
-    EXPECT_FAIL_WITH_VMEM_MSG(vmem_alloc(0));
-    EXPECT_FAIL_WITH_VMEM_MSG(vmem_alloc(~0));
+UTEST(vmem, error_messages) {
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_alloc(0));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_alloc(~0));
 
-    EXPECT_FAIL_WITH_VMEM_MSG(vmem_alloc_protect(1, Vmem_Protect_Invalid));
-    EXPECT_FAIL_WITH_VMEM_MSG(vmem_alloc_protect(1, (Vmem_Protect)12345));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_alloc_protect(1, Vmem_Protect_Invalid));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_alloc_protect(1, (Vmem_Protect)12345));
 
-    EXPECT_FAIL_WITH_VMEM_MSG(vmem_free(0, 0));
-    EXPECT_FAIL_WITH_VMEM_MSG(vmem_free(0, 123));
-    EXPECT_FAIL_WITH_VMEM_MSG(vmem_free((void*)1, 0));
-    EXPECT_FAIL_WITH_VMEM_MSG(vmem_free((void*)1, 1));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_free(0, 0));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_free(0, 123));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_free((void*)1, 0));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_free((void*)1, 1));
 
-    EXPECT_FAIL_WITH_VMEM_MSG(vmem_lock(0, 0));
-    EXPECT_FAIL_WITH_VMEM_MSG(vmem_lock(0, 123));
-    EXPECT_FAIL_WITH_VMEM_MSG(vmem_lock((void*)1, 0));
-    EXPECT_FAIL_WITH_VMEM_MSG(vmem_lock((void*)1, 1));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_lock(0, 0));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_lock(0, 123));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_lock((void*)1, 0));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_lock((void*)1, 1));
 
-    EXPECT_FAIL_WITH_VMEM_MSG(vmem_unlock(0, 0));
-    EXPECT_FAIL_WITH_VMEM_MSG(vmem_unlock(0, 123));
-    EXPECT_FAIL_WITH_VMEM_MSG(vmem_unlock((void*)1, 0));
-    EXPECT_FAIL_WITH_VMEM_MSG(vmem_unlock((void*)1, 1));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_unlock(0, 0));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_unlock(0, 123));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_unlock((void*)1, 0));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_unlock((void*)1, 1));
 
-    EXPECT_FAIL_WITH_VMEM_MSG(vmem_protect(0, 0, Vmem_Protect_ReadWrite));
-    EXPECT_FAIL_WITH_VMEM_MSG(vmem_protect(0, 123, Vmem_Protect_ReadWrite));
-    EXPECT_FAIL_WITH_VMEM_MSG(vmem_protect((void*)1, 0, Vmem_Protect_ReadWrite));
-    EXPECT_FAIL_WITH_VMEM_MSG(vmem_protect((void*)1, 1, Vmem_Protect_ReadWrite));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_protect(0, 0, Vmem_Protect_ReadWrite));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_protect(0, 123, Vmem_Protect_ReadWrite));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_protect((void*)1, 0, Vmem_Protect_ReadWrite));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_protect((void*)1, 1, Vmem_Protect_ReadWrite));
 
-    EXPECT_FAIL_WITH_VMEM_MSG(vmem_align_forward(123, 0));
-    EXPECT_FAIL_WITH_VMEM_MSG(vmem_align_forward(123, 3));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_align_forward(123, 0));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_align_forward(123, 3));
 
-    EXPECT_FAIL_WITH_VMEM_MSG(vmem_align_backward(123, 0));
-    EXPECT_FAIL_WITH_VMEM_MSG(vmem_align_backward(123, 3));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_align_backward(123, 0));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_align_backward(123, 3));
 }
 
 UTEST(funcs, common) {
@@ -155,7 +156,7 @@ UTEST(vmem, overlapped_page) {
     ASSERT_TRUE(ptr);
 
     ASSERT_TRUE(vmem_commit(ptr, vmem_get_page_size()));
-    // This should fail because only the first page should be commited.
+    // This should error because only the first page should be commited.
     ASSERT_FALSE(vmem_protect(ptr + vmem_get_page_size(), vmem_get_page_size(), Vmem_Protect_Read));
 
     ASSERT_TRUE(vmem_commit(ptr, size));

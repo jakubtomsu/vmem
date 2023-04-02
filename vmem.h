@@ -43,12 +43,12 @@ extern "C" {
 
 typedef size_t Vmem_Size;
 typedef uint8_t Vmem_Protect;
-// Success/Failure result (Vmem_Result_).
+// Success/Error result (Vmem_Result_).
 // You can use this in an if statement: if(vmem_commit(...)) { do something... }
 typedef int Vmem_Result;
 
 typedef enum Vmem_Result_ {
-    Vmem_Result_Failure = 0, // false
+    Vmem_Result_Error = 0,   // false
     Vmem_Result_Success = 1, // true
 } Vmem_Result_;
 
@@ -74,7 +74,7 @@ typedef enum Vmem_Protect_ {
 VMEM_FUNC void vmem_init();
 
 // Reserves (allocates but doesn't commit) a block of virtual address-space of size `num_bytes`.
-// @returns 0 on failure, start address of the allocated memory block on success.
+// @returns 0 on error, start address of the allocated memory block on success.
 VMEM_FUNC void* vmem_alloc_protect(Vmem_Size num_bytes, Vmem_Protect protect);
 
 // Reserves (allocates but doesn't commit) a block of virtual address-space of size `num_bytes`, in ReadWrite protection
@@ -82,7 +82,7 @@ VMEM_FUNC void* vmem_alloc_protect(Vmem_Size num_bytes, Vmem_Protect protect);
 // To maximize efficiency, try to always use a multiple of allocation granularity (see
 // `vmem_get_allocation_granularity`) for size of allocations.
 // @param num_bytes: total size of the memory block.
-// @returns 0 on failure, start address of the allocated memory block on success.
+// @returns 0 on error, start address of the allocated memory block on success.
 static VMEM_INLINE void* vmem_alloc(const Vmem_Size num_bytes) {
     return vmem_alloc_protect(num_bytes, Vmem_Protect_ReadWrite);
 }
@@ -149,8 +149,8 @@ VMEM_FUNC Vmem_Result vmem_unlock(void* ptr, Vmem_Size num_bytes);
 // Utilities
 //
 
-// This will return the last message after a function fails (Vmem_Result_Failure).
-VMEM_FUNC const char* vmem_get_failure_message();
+// This will return the last message after a function fails (Vmem_Result_Error).
+VMEM_FUNC const char* vmem_get_error_message();
 
 // Returns a static string for the protection mode.
 // e.g. Vmem_Protect_ReadWrite will return "ReadWrite".
@@ -160,13 +160,13 @@ VMEM_FUNC const char* vmem_get_protect_name(Vmem_Protect protect);
 // Round the `address` up to the next (or current) aligned address.
 // @param address: Memory address to align.
 // @param align: Address alignment. Must be a power of 2 and greater than 0.
-// @returns aligned address on success, Vmem_Result_Failure on failure.
+// @returns aligned address on success, Vmem_Result_Error on error.
 VMEM_FUNC uintptr_t vmem_align_forward(const uintptr_t address, const int align);
 
 // Round the `address` down to the previous (or current) aligned address.
 // @param address: Memory address to align.
 // @param align: Address alignment. Must be a power of 2 and greater than 0.
-// @returns aligned address on success, Vmem_Result_Failure on failure.
+// @returns aligned address on success, Vmem_Result_Error on error.
 VMEM_FUNC uintptr_t vmem_align_backward(const uintptr_t address, const int align);
 
 #if defined(__cplusplus)
@@ -238,21 +238,21 @@ VMEM_FUNC uintptr_t vmem_align_backward(const uintptr_t address, const int align
 #endif
 #endif
 
-#if !defined(VMEM_ON_FAILURE)
+#if !defined(VMEM_ON_ERROR)
 #include <assert.h>
-#define VMEM_ON_FAILURE(opt_string) assert(0 && (opt_string))
+#define VMEM_ON_ERROR(opt_string) assert(0 && (opt_string))
 #endif
 
 #if !defined(VMEM_NO_ERROR_CHECKING)
 // clang-format off
 #if !defined(VMEM_NO_ERROR_MESSAGES)
-#define VMEM_FAIL_IF(cond, write_message) do { if(cond) { write_message; VMEM_ON_FAILURE(#cond); return 0; } } while(0)
+#define VMEM_ERROR_IF(cond, write_message) do { if(cond) { write_message; VMEM_ON_ERROR(#cond); return 0; } } while(0)
 #else
-#define VMEM_FAIL_IF(cond, write_message) do { if(cond) { VMEM_ON_FAILURE(#cond); return 0; } } while(0)
+#define VMEM_ERROR_IF(cond, write_message) do { if(cond) { VMEM_ON_ERROR(#cond); return 0; } } while(0)
 #endif
 // clang-format on
 #else
-#define VMEM_FAIL_IF(cond, write_message) // Ignore
+#define VMEM_ERROR_IF(cond, write_message) // Ignore
 #endif
 
 #if defined(__cplusplus)
@@ -278,33 +278,33 @@ VMEM_FUNC Vmem_Size vmem_get_allocation_granularity() {
 }
 
 #if !defined(VMEM_NO_ERROR_MESSAGES)
-VMEM_THREAD_LOCAL char vmem__g_failure_message[1024] = {};
+VMEM_THREAD_LOCAL char vmem__g_error_message[1024] = {};
 
-static void vmem__write_failure_message(const char* str) {
-    strcpy_s(vmem__g_failure_message, sizeof(vmem__g_failure_message), str);
+static void vmem__write_error_message(const char* str) {
+    strcpy_s(vmem__g_error_message, sizeof(vmem__g_error_message), str);
 }
 
-VMEM_FUNC const char* vmem_get_failure_message() {
-    return &vmem__g_failure_message[0];
+VMEM_FUNC const char* vmem_get_error_message() {
+    return &vmem__g_error_message[0];
 }
 #else
-#define vmem__write_failure_message(message) // Ignore
+#define vmem__write_error_message(message) // Ignore
 
-VMEM_FUNC const char* vmem_get_failure_message() {
-    return "<Failure messages disabled>";
+VMEM_FUNC const char* vmem_get_error_message() {
+    return "<Error messages disabled>";
 }
-#endif                                       // !defined(VMEM_NO_ERROR_MESSAGES)
+#endif                                     // !defined(VMEM_NO_ERROR_MESSAGES)
 
 VMEM_FUNC uintptr_t vmem_align_forward(const uintptr_t address, const int align) {
-    VMEM_FAIL_IF(align == 0, vmem__write_failure_message("Alignment cannot be zero."));
+    VMEM_ERROR_IF(align == 0, vmem__write_error_message("Alignment cannot be zero."));
     const uintptr_t mask = (uintptr_t)(align - 1);
-    VMEM_FAIL_IF((align & mask) != 0, vmem__write_failure_message("Alignment has to be a power of 2."));
+    VMEM_ERROR_IF((align & mask) != 0, vmem__write_error_message("Alignment has to be a power of 2."));
     return (address + mask) & ~mask;
 }
 
 VMEM_FUNC uintptr_t vmem_align_backward(const uintptr_t address, const int align) {
-    VMEM_FAIL_IF(align == 0, vmem__write_failure_message("Alignment cannot be zero."));
-    VMEM_FAIL_IF((align & (align - 1)) != 0, vmem__write_failure_message("Alignment has to be a power of 2."));
+    VMEM_ERROR_IF(align == 0, vmem__write_error_message("Alignment cannot be zero."));
+    VMEM_ERROR_IF((align & (align - 1)) != 0, vmem__write_error_message("Alignment has to be a power of 2."));
     return address & ~(align - 1);
 }
 
@@ -334,37 +334,37 @@ static DWORD vmem__win32_protect(const Vmem_Protect protect) {
         case Vmem_Protect_ExecuteRead: return PAGE_EXECUTE_READ;
         case Vmem_Protect_ExecuteReadWrite: return PAGE_EXECUTE_READWRITE;
     }
-    vmem__write_failure_message("Invalid protect mode.");
-    return Vmem_Result_Failure;
+    vmem__write_error_message("Invalid protect mode.");
+    return Vmem_Result_Error;
 }
 
 #if !defined(VMEM_NO_ERROR_MESSAGES)
-static void vmem__write_win32_failure_message() {
+static void vmem__write_win32_error_message() {
     const DWORD result = FormatMessageA(
         FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
         NULL,
         GetLastError(),
         MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-        vmem__g_failure_message,
-        sizeof(vmem__g_failure_message),
+        vmem__g_error_message,
+        sizeof(vmem__g_error_message),
         NULL);
 
     if(result == 0) {
-        vmem__write_failure_message("<Failed to format Win32 error>");
+        vmem__write_error_message("<Failed to format Win32 error>");
     } else {
         // Rewrite the last \n to zero
-        vmem__g_failure_message[(int)result - 1] = '\0';
+        vmem__g_error_message[(int)result - 1] = '\0';
     }
 }
 #endif
 
 VMEM_FUNC void* vmem_alloc_protect(const Vmem_Size num_bytes, const Vmem_Protect protect) {
-    VMEM_FAIL_IF(num_bytes == 0, vmem__write_failure_message("Cannot allocate memory block with size 0 bytes."));
+    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Cannot allocate memory block with size 0 bytes."));
 
     const DWORD protect_win32 = vmem__win32_protect(protect);
     if(protect_win32) {
         LPVOID address = VirtualAlloc(NULL, (SIZE_T)num_bytes, MEM_RESERVE, protect_win32);
-        VMEM_FAIL_IF(address == NULL, vmem__write_win32_failure_message());
+        VMEM_ERROR_IF(address == NULL, vmem__write_win32_error_message());
         // Note: memory is initialized to zero.
         return address;
     }
@@ -373,41 +373,41 @@ VMEM_FUNC void* vmem_alloc_protect(const Vmem_Size num_bytes, const Vmem_Protect
 }
 
 VMEM_FUNC Vmem_Result vmem_free(void* ptr, const Vmem_Size num_allocated_bytes) {
-    VMEM_FAIL_IF(ptr == 0, vmem__write_failure_message("Ptr cannot be null."));
-    VMEM_FAIL_IF(
+    VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
+    VMEM_ERROR_IF(
         num_allocated_bytes == 0,
-        vmem__write_failure_message("Cannot free a memory block of size 0 (num_allocated_bytes is 0)."));
+        vmem__write_error_message("Cannot free a memory block of size 0 (num_allocated_bytes is 0)."));
 
     const BOOL result = VirtualFree(ptr, 0, MEM_RELEASE);
-    VMEM_FAIL_IF(result == 0, vmem__write_win32_failure_message());
+    VMEM_ERROR_IF(result == 0, vmem__write_win32_error_message());
     return Vmem_Result_Success;
 }
 
 VMEM_FUNC Vmem_Result vmem_commit_protect(void* ptr, const Vmem_Size num_bytes, const Vmem_Protect protect) {
-    VMEM_FAIL_IF(ptr == 0, vmem__write_failure_message("Ptr cannot be null."));
-    VMEM_FAIL_IF(num_bytes == 0, vmem__write_failure_message("Size (num_bytes cannot be null."));
+    VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
+    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes cannot be null."));
 
     const LPVOID result = VirtualAlloc(ptr, num_bytes, MEM_COMMIT, vmem__win32_protect(protect));
-    VMEM_FAIL_IF(result == 0, vmem__write_win32_failure_message());
+    VMEM_ERROR_IF(result == 0, vmem__write_win32_error_message());
     return Vmem_Result_Success;
 }
 
 VMEM_FUNC Vmem_Result vmem_decommit(void* ptr, const Vmem_Size num_bytes) {
-    VMEM_FAIL_IF(ptr == 0, vmem__write_failure_message("Ptr cannot be null."));
-    VMEM_FAIL_IF(num_bytes == 0, vmem__write_failure_message("Size (num_bytes cannot be null."));
+    VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
+    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes cannot be null."));
 
     const BOOL result = VirtualFree(ptr, num_bytes, MEM_DECOMMIT);
-    VMEM_FAIL_IF(result == 0, vmem__write_win32_failure_message());
+    VMEM_ERROR_IF(result == 0, vmem__write_win32_error_message());
     return Vmem_Result_Success;
 }
 
 VMEM_FUNC Vmem_Result vmem_protect(void* ptr, const Vmem_Size num_bytes, const Vmem_Protect protect) {
-    VMEM_FAIL_IF(ptr == 0, vmem__write_failure_message("Ptr cannot be null."));
-    VMEM_FAIL_IF(num_bytes == 0, vmem__write_failure_message("Size (num_bytes cannot be null."));
+    VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
+    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes cannot be null."));
 
     DWORD old_protect = 0;
     const BOOL result = VirtualProtect(ptr, num_bytes, vmem__win32_protect(protect), &old_protect);
-    VMEM_FAIL_IF(result == 0, vmem__write_win32_failure_message());
+    VMEM_ERROR_IF(result == 0, vmem__write_win32_error_message());
     return Vmem_Result_Success;
 }
 
@@ -424,20 +424,20 @@ VMEM_FUNC Vmem_Size vmem_query_allocation_granularity() {
 }
 
 VMEM_FUNC Vmem_Result vmem_lock(void* ptr, const Vmem_Size num_bytes) {
-    VMEM_FAIL_IF(ptr == 0, vmem__write_failure_message("Ptr cannot be null."));
-    VMEM_FAIL_IF(num_bytes == 0, vmem__write_failure_message("Size (num_bytes cannot be null."));
+    VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
+    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes cannot be null."));
 
     const BOOL result = VirtualLock(ptr, num_bytes);
-    VMEM_FAIL_IF(result == 0, vmem__write_win32_failure_message());
+    VMEM_ERROR_IF(result == 0, vmem__write_win32_error_message());
     return Vmem_Result_Success;
 }
 
 VMEM_FUNC Vmem_Result vmem_unlock(void* ptr, const Vmem_Size num_bytes) {
-    VMEM_FAIL_IF(ptr == 0, vmem__write_failure_message("Ptr cannot be null."));
+    VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
     if(num_bytes == 0) return 0;
 
     const BOOL result = VirtualUnlock(ptr, num_bytes);
-    VMEM_FAIL_IF(result == 0, vmem__write_win32_failure_message());
+    VMEM_ERROR_IF(result == 0, vmem__write_win32_error_message());
     return Vmem_Result_Success;
 }
 
@@ -458,53 +458,53 @@ static int vmem__linux_protect(const Vmem_Protect protect) {
         case Vmem_Protect_ExecuteRead: return PROT_EXEC | PROT_READ;
         case Vmem_Protect_ExecuteReadWrite: return PROT_EXEC | PROT_READ | PROT_WRITE;
     }
-    vmem__write_failure_message("Invalid protect mode.");
-    return Vmem_Result_Failure;
+    vmem__write_error_message("Invalid protect mode.");
+    return Vmem_Result_Error;
 }
 
 #if !defined(VMEM_NO_ERROR_MESSAGES)
-static const char* vmem__write_linux_failure_reason() {
+static const char* vmem__write_linux_error_reason() {
     // https://linux.die.net/man/3/strerror_r
 #ifdef STRERROR_R_CHAR_P
     // GNU variant can return a pointer outside the passed buffer
-    return strerror_r(errno, vmem__g_failure_message, sizeof(vmem__g_failure_message));
+    return strerror_r(errno, vmem__g_error_message, sizeof(vmem__g_error_message));
 #else
     // POSIX variant always returns message in buffer
-    if(strerror_r(errno, vmem__g_failure_message, sizeof(vmem__g_failure_message)) != 0) {
-        vmem__write_failure_message("<Failed to retrieve errno string>");
+    if(strerror_r(errno, vmem__g_error_message, sizeof(vmem__g_error_message)) != 0) {
+        vmem__write_error_message("<Failed to retrieve errno string>");
     }
 #endif
 }
 #endif
 
 VMEM_FUNC void* vmem_alloc_protect(const Vmem_Size num_bytes, const Vmem_Protect protect) {
-    VMEM_FAIL_IF(num_bytes == 0, vmem__write_failure_message("Size (num_bytes cannot be null."));
+    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes cannot be null."));
 
     const int prot = vmem__linux_protect(protect);
     if(prot) {
         const int flags = MAP_PRIVATE | MAP_ANONYMOUS;
         // Note: memory is always initialized to zero when using MAP_ANONYMOUS.
         void* result = mmap(0, num_bytes, prot, flags, -1, 0);
-        VMEM_FAIL_IF(result == MAP_FAILED, vmem__write_linux_failure_reason());
+        VMEM_ERROR_IF(result == MAP_FAILED, vmem__write_linux_error_reason());
         return result;
     }
-    return Vmem_Result_Failure;
+    return Vmem_Result_Error;
 }
 
 VMEM_FUNC Vmem_Result vmem_free(void* ptr, const Vmem_Size num_allocated_bytes) {
-    VMEM_FAIL_IF(ptr == 0, vmem__write_failure_message("Ptr cannot be null."));
-    VMEM_FAIL_IF(
+    VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
+    VMEM_ERROR_IF(
         num_allocated_bytes == 0,
-        vmem__write_failure_message("Cannot free a memory block of size 0 (num_allocated_bytes is 0)."));
+        vmem__write_error_message("Cannot free a memory block of size 0 (num_allocated_bytes is 0)."));
 
     const int result = munmap(ptr, num_allocated_bytes);
-    VMEM_FAIL_IF(result != 0, vmem__write_linux_failure_reason());
+    VMEM_ERROR_IF(result != 0, vmem__write_linux_error_reason());
     return Vmem_Result_Success;
 }
 
 VMEM_FUNC Vmem_Result vmem_commit_protect(void* ptr, const Vmem_Size num_bytes, const Vmem_Protect protect) {
-    VMEM_FAIL_IF(ptr == 0, vmem__write_failure_message("Ptr cannot be null."));
-    VMEM_FAIL_IF(num_bytes == 0, vmem__write_failure_message("Size (num_bytes cannot be null."));
+    VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
+    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes cannot be null."));
 
     // On linux the pages are created in a reserved state and automatically commited on the first write, so we don't
     // need to commit anything.
@@ -514,20 +514,20 @@ VMEM_FUNC Vmem_Result vmem_commit_protect(void* ptr, const Vmem_Size num_bytes, 
 }
 
 VMEM_FUNC Vmem_Result vmem_decommit(void* ptr, const Vmem_Size num_bytes) {
-    VMEM_FAIL_IF(ptr == 0, vmem__write_failure_message("Ptr cannot be null."));
-    VMEM_FAIL_IF(num_bytes == 0, vmem__write_failure_message("Size (num_bytes cannot be null."));
+    VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
+    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes cannot be null."));
 
     const int result = madvise(ptr, num_bytes, MADV_DONTNEED);
-    VMEM_FAIL_IF(result != 0, vmem__write_linux_failure_reason());
+    VMEM_ERROR_IF(result != 0, vmem__write_linux_error_reason());
     return Vmem_Result_Success;
 }
 
 VMEM_FUNC Vmem_Result vmem_protect(void* ptr, const Vmem_Size num_bytes, const Vmem_Protect protect) {
-    VMEM_FAIL_IF(ptr == 0, vmem__write_failure_message("Ptr cannot be null."));
-    VMEM_FAIL_IF(num_bytes == 0, vmem__write_failure_message("Size (num_bytes cannot be null."));
+    VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
+    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes cannot be null."));
 
     const int result = mprotect(ptr, num_bytes, vmem__linux_protect(protect));
-    VMEM_FAIL_IF(result != 0, vmem__write_linux_failure_reason());
+    VMEM_ERROR_IF(result != 0, vmem__write_linux_error_reason());
     return Vmem_Result_Success;
 }
 
@@ -540,20 +540,20 @@ VMEM_FUNC Vmem_Size vmem_query_allocation_granularity() {
 }
 
 VMEM_FUNC Vmem_Result vmem_lock(void* ptr, const Vmem_Size num_bytes) {
-    VMEM_FAIL_IF(ptr == 0, vmem__write_failure_message("Ptr cannot be null."));
-    VMEM_FAIL_IF(num_bytes == 0, vmem__write_failure_message("Size (num_bytes cannot be null."));
+    VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
+    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes cannot be null."));
 
     const int result = mlock(ptr, num_bytes);
-    VMEM_FAIL_IF(result != 0, vmem__write_linux_failure_reason());
+    VMEM_ERROR_IF(result != 0, vmem__write_linux_error_reason());
     return Vmem_Result_Success;
 }
 
 VMEM_FUNC Vmem_Result vmem_unlock(void* ptr, const Vmem_Size num_bytes) {
-    VMEM_FAIL_IF(ptr == 0, vmem__write_failure_message("Ptr cannot be null."));
-    VMEM_FAIL_IF(num_bytes == 0, vmem__write_failure_message("Size (num_bytes cannot be null."));
+    VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
+    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes cannot be null."));
 
     const int result = munlock(ptr, num_bytes);
-    VMEM_FAIL_IF(result != 0, vmem__write_linux_failure_reason());
+    VMEM_ERROR_IF(result != 0, vmem__write_linux_error_reason());
     return Vmem_Result_Success;
 }
 #endif // defined(VMEM_PLATFORM_LINUX)

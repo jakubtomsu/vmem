@@ -52,22 +52,22 @@ cl vmem_test.cpp /Fevmem_test.exe
 ```
 
 ## Error mangement
-If a function fails, it returns a `Vmem_Result_Failure` (which is 0 or false).
-You can get a string message about the failure reason by calling `vmem_get_failure_message`.
+If a function fails, it returns a `Vmem_Result_Error` (which is 0 or false).
+You can get a string message about the error reason by calling `vmem_get_error_message`.
 
-But by default, each failure calls `assert(0)` from C standard library before returning.
-To change/disable failure this behavior, you can `#define VMEM_ON_FAILURE(opt_string)`.
+But by default, each error calls `assert(0)` from C standard library before returning.
+To change/disable this behavior, you can `#define VMEM_ON_ERROR(opt_string) ...`.
 
 Example of dealing with errors:
 ```c
-#define VMEM_ON_FAILURE(opt_string) // Disable the default assertion
+#define VMEM_ON_ERROR(opt_string) // Disable the default assertion
 #define VMEM_IMPLEMENTATION
 #include "vmem.h"
 #include <stdio.h> // printf
 
 int main() {
     if(!vmem_free(0, 0)) {
-        printf("vmem_free failed with message: %s\n", vmem_get_failure_message());
+        printf("vmem_free failed with message: %s\n", vmem_get_error_message());
         // Handle the error ...
     }
     return 0;

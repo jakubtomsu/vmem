@@ -51,3 +51,6 @@ Or in `x64 Developer Command Prompt` on windows, using MSVC:
 cl vmem_test.cpp /Fevmem_test.exe
 ```
 
+## Error mangement
+
+## API function docs

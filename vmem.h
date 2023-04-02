@@ -16,8 +16,8 @@
 // LICENSE
 //      See end of file for license information.
 
-#ifndef INCLUDE_VMEM_H
-#define INCLUDE_VMEM_H
+#if !defined(VMEM_H_INCLUDED)
+#define VMEM_H_INCLUDED
 
 #include <stdint.h>
 #include <stddef.h> // size_t
@@ -26,8 +26,8 @@
 #define VMEM_FUNC
 #endif
 
-#ifndef _MSC_VER
-#ifdef __cplusplus
+#if !defined(_MSC_VER)
+#if defined(__cplusplus)
 #define VMEM_INLINE inline
 #else
 #define VMEM_INLINE
@@ -37,7 +37,7 @@
 #endif
 
 
-#ifdef __cplusplus
+#if defined(__cplusplus)
 extern "C" {
 #endif
 
@@ -79,6 +79,8 @@ VMEM_FUNC void* vmem_alloc_protect(Vmem_Size num_bytes, Vmem_Protect protect);
 
 // Reserves (allocates but doesn't commit) a block of virtual address-space of size `num_bytes`, in ReadWrite protection
 // mode. The memory is zeroed. Free with `vmem_free`. Note: you must commit the memory before using it.
+// To maximize efficiency, try to always use a multiple of allocation granularity (see
+// `vmem_get_allocation_granularity`) for size of allocations.
 // @param num_bytes: total size of the memory block.
 // @returns 0 on failure, start address of the allocated memory block on success.
 static VMEM_INLINE void* vmem_alloc(const Vmem_Size num_bytes) {
@@ -117,16 +119,19 @@ VMEM_FUNC Vmem_Result vmem_decommit(void* ptr, Vmem_Size num_bytes);
 // Sets protection mode for the region of pages. All of the pages must be commited.
 VMEM_FUNC Vmem_Result vmem_protect(void* ptr, Vmem_Size num_bytes, Vmem_Protect protect);
 
-// Get page size. Uses cached value from `vmem_query_page_size`, loaded at startup time. Usually something like 4096.
-// @returns the page size in number bytes. Cannot fail.
+// @returns cached value from `vmem_query_page_size`
 VMEM_FUNC Vmem_Size vmem_get_page_size();
 
-// Query the page size from the system.
+// Query the page size from the system. Usually something like 4096 bytes.
 // @returns the page size in number bytes. Cannot fail.
 VMEM_FUNC Vmem_Size vmem_query_page_size();
 
+// @returns cached value from `vmem_query_allocation_granularity`
 VMEM_FUNC Vmem_Size vmem_get_allocation_granularity();
 
+// Query the allocation granularity (alignment of each allocation) from the system.
+// Usually 65KB on Windows and 4KB on linux (on linux it's page size).
+// @returns allocation granularity in bytes.
 VMEM_FUNC Vmem_Size vmem_query_allocation_granularity();
 
 // Locks the specified region of the process's virtual address space into physical memory, ensuring that subsequent
@@ -164,7 +169,7 @@ VMEM_FUNC uintptr_t vmem_align_forward(const uintptr_t address, const int align)
 // @returns aligned address on success, Vmem_Result_Failure on failure.
 VMEM_FUNC uintptr_t vmem_align_backward(const uintptr_t address, const int align);
 
-#ifdef __cplusplus
+#if defined(__cplusplus)
 } // extern "C"
 #endif
 
@@ -178,16 +183,17 @@ VMEM_FUNC uintptr_t vmem_align_backward(const uintptr_t address, const int align
 #endif
 #endif // !defined(VMEM_NO_AUTO_PLATFORM)
 
-#endif // INCLUDE_VMEM_H
+#endif // !defined(VMEM_H_INCLUDED)
 
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // VMEM_IMPLEMENTATION
 //
-#if defined(VMEM_IMPLEMENTATION)
+#if defined(VMEM_IMPLEMENTATION) && !defined(VMEM_H_IMPLEMENTED)
+#define VMEM_H_IMPLEMENTED
 
-#ifndef VMEM_UNUSED
+#if !defined(VMEM_UNUSED)
 #define VMEM_UNUSED(varible) (void)(varible)
 #endif
 
@@ -220,7 +226,7 @@ VMEM_FUNC uintptr_t vmem_align_backward(const uintptr_t address, const int align
 #define VMEM_THREAD_LOCAL _Thread_local
 #endif
 
-#ifndef VMEM_THREAD_LOCAL
+#if !defined(VMEM_THREAD_LOCAL)
 #if defined(__GNUC__)
 #define VMEM_THREAD_LOCAL __thread
 #endif
@@ -249,7 +255,7 @@ VMEM_FUNC uintptr_t vmem_align_backward(const uintptr_t address, const int align
 #define VMEM_FAIL_IF(cond, write_message) // Ignore
 #endif
 
-#ifdef __cplusplus
+#if defined(__cplusplus)
 extern "C" {
 #endif
 
@@ -552,11 +558,11 @@ VMEM_FUNC Vmem_Result vmem_unlock(void* ptr, const Vmem_Size num_bytes) {
 }
 #endif // defined(VMEM_PLATFORM_LINUX)
 
-#ifdef __cplusplus
+#if defined(__cplusplus)
 }
 #endif
 
-#endif // defined(VMEM_IMPLEMENTATION)
+#endif // defined(VMEM_IMPLEMENTATION) && !defined(VMEM_H_IMPLEMENTED)
 
 /*
 ------------------------------------------------------------------------------

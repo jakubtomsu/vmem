@@ -1,5 +1,6 @@
 // vmem.h - v0.1 - public domain
 // no warranty implied; use at your own risk.
+//
 // https://github.com/jakubtomsu/vmem
 //
 // Do this:
@@ -20,8 +21,6 @@
 
 #include <stdint.h>
 #include <stddef.h> // size_t
-
-#include <stdio.h> // TEMP HACK
 
 #define VMEM_FUNC
 
@@ -74,21 +73,21 @@ static inline void* vmem_alloc(const Vmem_Size num_bytes) {
 }
 
 // Frees (releases) a block of virtual memory.
-// @param ptr: a pointer to the start of the memory block. Result of `vmem_alloc`.
+// @param alloc_ptr: a pointer to the start of the memory block. Result of `vmem_alloc`.
 // @param num_allocated_bytes: *must* be the value returned by `vmem_alloc`.
 //  It isn't used on windows, but it's required on unix platforms.
-VMEM_FUNC Vmem_Result vmem_free(void* ptr, Vmem_Size num_allocated_bytes);
+VMEM_FUNC Vmem_Result vmem_free(void* alloc_ptr, Vmem_Size num_allocated_bytes);
 
-// Commit memory pages which contain one or more bytes in [ptr...ptr+num_bytes].
-// This maps the pages to physical memory.
+// Commit memory pages which contain one or more bytes in [ptr...ptr+num_bytes]. The pages will be mapped to physical
+// memory.
 // Decommit with `vmem_decommit`.
 // @param ptr: pointer to the pointer returned by `vmem_alloc` or shifted by [0...num_bytes].
 // @param num_bytes: number of bytes to commit.
 // @param protect: protection mode for the newly commited pages.
 VMEM_FUNC Vmem_Result vmem_commit_protect(void* ptr, Vmem_Size num_bytes, Vmem_Protect protect);
 
-// Commit ReadWrite memory pages which contain one or more bytes in [ptr...ptr+num_bytes].
-// This maps the pages to physical memory.
+// Commit memory pages which contain one or more bytes in [ptr...ptr+num_bytes]. The pages will be mapped to physical
+// memory. The page protection mode will be changed to ReadWrite. Use `vmem_commit_protect` to specify a different mode.
 // Decommit with `vmem_decommit`.
 // @param ptr: pointer to the pointer returned by `vmem_alloc` or shifted by [0...num_bytes].
 // @param num_bytes: number of bytes to commit.
@@ -96,9 +95,8 @@ static inline Vmem_Result vmem_commit(void* ptr, const Vmem_Size num_bytes) {
     return vmem_commit_protect(ptr, num_bytes, Vmem_Protect_ReadWrite);
 }
 
-// Decommits the memory pages which contain one or more bytes in [ptr...ptr+num_bytes].
-// This unmaps the pages from physical memory.
-// Note: if you want to use the memory region again, you need to use `vmem_commit`.
+// Decommits the memory pages which contain one or more bytes in [ptr...ptr+num_bytes]. The pages will be unmapped from
+// physical memory.
 // @param ptr: pointer to the pointer returned by `vmem_alloc` or shifted by [0...num_bytes].
 // @param num_bytes: number of bytes to decommit.
 VMEM_FUNC Vmem_Result vmem_decommit(void* ptr, Vmem_Size num_bytes);
@@ -113,6 +111,10 @@ VMEM_FUNC Vmem_Size vmem_get_page_size();
 // Query the page size from the system.
 // @returns the page size in number bytes. Cannot fail.
 VMEM_FUNC Vmem_Size vmem_query_page_size();
+
+VMEM_FUNC Vmem_Size vmem_get_allocation_granularity();
+
+VMEM_FUNC Vmem_Size vmem_query_allocation_granularity();
 
 // Locks the specified region of the process's virtual address space into physical memory, ensuring that subsequent
 // access to the region will not incur a page fault.

@@ -13,7 +13,7 @@
 //      #define VMEM_IMPLEMENTATION
 //      #include "vmem.h"
 //
-// LICENSE
+// # LICENSE
 //      See end of file for license information.
 
 #if !defined(VMEM_H_INCLUDED)

@@ -52,5 +52,12 @@ cl vmem_test.cpp /Fevmem_test.exe
 ```
 
 ## Error mangement
+If a function fails, it returns a `Vmem_Result_Failure` (which is 0 or false).
+You can get a string message about the failure reason by calling `vmem_get_failure_message`.
 
-## API function docs
+But by default, each failure calls `assert(0)` from C standard library before returning.
+To change/disable failure this behavior, you can `#define VMEM_ON_FAILURE(opt_string)`.
+
+## Compile-time options
+
+## Tests

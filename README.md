@@ -40,6 +40,9 @@ vmem_free(ptr, size);
 I would also like to add support for Mac, iOS and Android.
 Game consoles aren't supported, you will need to implement the platform backends on your own.
 
+## Dependencies
+There are zero dependencies apart from the C standard library.
+
 ## Tests
 Tests use the [utest.h](https://github.com/sheredom/utest.h) library.
 

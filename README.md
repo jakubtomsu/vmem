@@ -1,7 +1,6 @@
 # 💾 vmem.h
 A simple [STB-style](https://github.com/nothings/stb/blob/master/docs/stb_howto.txt) cross-platform C/C++ library for managing virtual memory.
 
-# Documentation
 ## Usage
 Define `VMEM_IMPLEMENTATION` in only *one* C or C++ source file before including `vmem.h` to create the implementation.
 

@@ -62,8 +62,8 @@ UTEST(funcs, protect) {
     const int size = 1024 * 1024;
     void* ptr = vmem_alloc(size);
     ASSERT_TRUE(ptr);
-    EXPECT_FALSE(vmem_protect(ptr, size, Vmem_Protect_Read));
-    EXPECT_TRUE(vmem_commit(ptr, 1024));
+    ASSERT_FALSE(vmem_protect(ptr, size, Vmem_Protect_Read));
+    ASSERT_TRUE(vmem_commit(ptr, 1024));
 
     EXPECT_TRUE(vmem_protect(ptr, 1024, Vmem_Protect_NoAccess));
     EXPECT_TRUE(vmem_protect(ptr, 1024, Vmem_Protect_Read));
@@ -104,6 +104,12 @@ UTEST(funcs, page_size) {
     ASSERT_TRUE(vmem_get_page_size() > 0);
     ASSERT_TRUE(vmem_query_page_size() > 0);
     ASSERT_TRUE(vmem_query_page_size() == vmem_get_page_size());
+}
+
+UTEST(funcs, allocation_granularity) {
+    ASSERT_TRUE(vmem_get_allocation_granularity() > 0);
+    ASSERT_TRUE(vmem_query_allocation_granularity() > 0);
+    ASSERT_TRUE(vmem_query_allocation_granularity() == vmem_get_allocation_granularity());
 }
 
 UTEST(perf, many_allocs_frees) {

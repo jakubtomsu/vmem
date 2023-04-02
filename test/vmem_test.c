@@ -1,6 +1,5 @@
 // This is a simple program to demonstrate the API and test it's features for correctness.
 
-#define VMEM_NO_ERROR_MESSAGES
 #define VMEM_ON_ERROR(opt_string) // Ignore for tests
 #define VMEM_IMPLEMENTATION
 #include "../vmem.h"

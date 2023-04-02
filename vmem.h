@@ -1,6 +1,7 @@
 // vmem.h - v0.1 - public domain
 // no warranty implied; use at your own risk.
 //
+// The latest version of this library is available on GitHub:
 // https://github.com/jakubtomsu/vmem
 //
 // Do this:
@@ -13,7 +14,7 @@
 //      #define VMEM_IMPLEMENTATION
 //      #include "vmem.h"
 //
-//  LICENSE
+// LICENSE
 //      See end of file for license information.
 //
 // Compile-time options
@@ -293,7 +294,7 @@ VMEM_FUNC Vmem_Size vmem_get_allocation_granularity() {
 VMEM_THREAD_LOCAL char vmem__g_error_message[1024] = {};
 
 static void vmem__write_error_message(const char* str) {
-    strcpy_s(vmem__g_error_message, sizeof(vmem__g_error_message), str);
+    strncpy(vmem__g_error_message, str, sizeof(vmem__g_error_message));
 }
 
 VMEM_FUNC const char* vmem_get_error_message() {
@@ -475,7 +476,7 @@ static int vmem__linux_protect(const Vmem_Protect protect) {
 }
 
 #if !defined(VMEM_NO_ERROR_MESSAGES)
-static const char* vmem__write_linux_error_reason() {
+static void vmem__write_linux_error_reason() {
     // https://linux.die.net/man/3/strerror_r
 #ifdef STRERROR_R_CHAR_P
     // GNU variant can return a pointer outside the passed buffer
@@ -500,7 +501,7 @@ VMEM_FUNC void* vmem_alloc_protect(const Vmem_Size num_bytes, const Vmem_Protect
         VMEM_ERROR_IF(result == MAP_FAILED, vmem__write_linux_error_reason());
         return result;
     }
-    return Vmem_Result_Error;
+    return 0; // Vmem_Result_Error
 }
 
 VMEM_FUNC Vmem_Result vmem_free(void* ptr, const Vmem_Size num_allocated_bytes) {

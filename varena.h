@@ -8,11 +8,11 @@
 #include <stddef.h> // size_t
 #include <assert.h>
 
-// Arena of virtual memory. Initialize with `arena_init` and deinitialize with `arena_deinit`.
+// Arena of virtual memory. Initialize with `varena_init` and deinitialize with `varena_deinit`.
 // All of the allocations have stable address, the memory is never reallocated. Well suited
 // for large arrays of data and other containers. You can commit only the memory that you need,
 // so even large arenas (100GB) are completely fine.
-typedef struct Arena {
+typedef struct VArena {
     // Pointer to the allocated memory. Do not modify the pointer itself (you can read/write data from it fine).
     uint8_t* _buf;
     // Total size of the `buf` memory allocation. Do not modify.
@@ -21,20 +21,20 @@ typedef struct Arena {
     size_t _commited;
     // Number of used bytes.
     size_t len;
-} Arena;
+} VArena;
 
 #if defined(__cplusplus)
 extern "C" {
 #endif
 
 // Reserve virtual memory of size `max_bytes` and initialize arena.
-Arena arena_init(const size_t max_bytes);
+VArena varena_init(const size_t max_bytes);
 // Dealloc the memory and reset.
-void arena_deinit(Arena* arena);
-size_t arena_calc_bytes_used_for_size(size_t cap);
-int arena_is_valid(Arena arena);
-void arena_set_commited(Arena* arena, size_t commited);
-uint8_t* arena_push(Arena* arena, size_t num_bytes);
+void varena_deinit(VArena* arena);
+size_t varena_calc_bytes_used_for_size(size_t cap);
+int varena_is_valid(VArena arena);
+void varena_set_commited(VArena* arena, size_t commited);
+uint8_t* varena_push(VArena* arena, size_t num_bytes);
 
 #if defined(__cplusplus)
 } // extern "C"
@@ -63,31 +63,31 @@ uint8_t* arena_push(Arena* arena, size_t num_bytes);
 extern "C" {
 #endif
 
-Arena arena_init(const size_t max_bytes) {
-    Arena result = {};
+VArena varena_init(const size_t max_bytes) {
+    VArena result = {};
     result._buf = (uint8_t*)vmem_alloc(max_bytes);
     result._buf_len = max_bytes;
     return result;
 }
 
-void arena_deinit(Arena* arena) {
+void varena_deinit(VArena* arena) {
     vmem_dealloc(arena->_buf, arena->_buf_len);
     arena->_buf = 0;
 }
 
-static inline size_t arena_calc_bytes_used_for_size(const size_t cap) {
+static inline size_t varena_calc_bytes_used_for_size(const size_t cap) {
     return vmem_align_forward(cap, vmem_get_page_size());
 }
 
-int arena_is_valid(const Arena arena) {
+int varena_is_valid(const VArena arena) {
     return arena._buf != 0 && arena._buf_len > 0;
 }
 
-void arena_set_commited(Arena* arena, const size_t commited) {
+void varena_set_commited(VArena* arena, const size_t commited) {
     if(commited == arena->_commited) return;
 
-    const size_t new_commited_bytes = arena_calc_bytes_used_for_size(commited);
-    const size_t current_commited_bytes = arena_calc_bytes_used_for_size(arena->_commited);
+    const size_t new_commited_bytes = varena_calc_bytes_used_for_size(commited);
+    const size_t current_commited_bytes = varena_calc_bytes_used_for_size(arena->_commited);
 
     if(new_commited_bytes != current_commited_bytes) {
         // Shrink
@@ -103,7 +103,7 @@ void arena_set_commited(Arena* arena, const size_t commited) {
             if(commited >= arena->_buf_len) {
                 // If you hit this, you likely either didn't alloc enough space up-front,
                 // or have a leak that is allocating too many elements
-                ARENA_ASSERT(0 && "[Arena] You've used up all the memory available.");
+                ARENA_ASSERT(0 && "[VArena] You've used up all the memory available.");
                 return;
             }
 
@@ -116,9 +116,9 @@ void arena_set_commited(Arena* arena, const size_t commited) {
     arena->_commited = commited;
 }
 
-uint8_t* arena_push(Arena* arena, const size_t num_bytes) {
+uint8_t* varena_push(VArena* arena, const size_t num_bytes) {
     // Ensure capacity
-    arena_set_commited(arena, arena->len + num_bytes);
+    varena_set_commited(arena, arena->len + num_bytes);
     const size_t start = arena->len;
     arena->len += num_bytes;
     return &arena->_buf[start];

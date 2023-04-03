@@ -34,7 +34,7 @@ void varena_deinit(VArena* arena);
 size_t varena_calc_bytes_used_for_size(size_t cap);
 int varena_is_valid(VArena arena);
 void varena_set_commited(VArena* arena, size_t commited);
-uint8_t* varena_push(VArena* arena, size_t num_bytes);
+uint8_t* varena_alloc(VArena* arena, size_t num_bytes);
 
 #if defined(__cplusplus)
 } // extern "C"
@@ -116,7 +116,7 @@ void varena_set_commited(VArena* arena, const size_t commited) {
     arena->_commited = commited;
 }
 
-uint8_t* varena_push(VArena* arena, const size_t num_bytes) {
+uint8_t* varena_alloc(VArena* arena, const size_t num_bytes) {
     // Ensure capacity
     varena_set_commited(arena, arena->len + num_bytes);
     const size_t start = arena->len;

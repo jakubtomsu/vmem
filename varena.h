@@ -1,7 +1,7 @@
 // Based on https://github.com/rdunnington/zig-stable-array
 
-#if !defined(ARENA_H_INCLUDED)
-#define ARENA_H_INCLUDED
+#if !defined(VARENA_H_INCLUDED)
+#define VARENA_H_INCLUDED
 
 #include "vmem.h"
 #include <stdint.h>
@@ -40,23 +40,23 @@ uint8_t* varena_push(VArena* arena, size_t num_bytes);
 } // extern "C"
 #endif
 
-#endif // !defined(ARENA_H_INCLUDED)
+#endif // !defined(VARENA_H_INCLUDED)
 
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
-// ARENA_IMPLEMENTATION
+// VARENA_IMPLEMENTATION
 //
-#if defined(ARENA_IMPLEMENTATION) && !defined(ARENA_H_IMPLEMENTED)
-#define ARENA_H_IMPLEMENTED
+#if defined(VARENA_IMPLEMENTATION) && !defined(VARENA_H_IMPLEMENTED)
+#define VARENA_H_IMPLEMENTED
 
 #include "vmem.h"
 #include <stdint.h>
 #include <stddef.h> // size_t
 
-#if !defined(ARENA_ASSERT)
+#if !defined(VARENA_ASSERT)
 #include <assert.h>
-#define ARENA_ASSERT(cond) assert(cond)
+#define VARENA_ASSERT(cond) assert(cond)
 #endif
 
 #if defined(__cplusplus)
@@ -103,7 +103,7 @@ void varena_set_commited(VArena* arena, const size_t commited) {
             if(commited >= arena->_buf_len) {
                 // If you hit this, you likely either didn't alloc enough space up-front,
                 // or have a leak that is allocating too many elements
-                ARENA_ASSERT(0 && "[VArena] You've used up all the memory available.");
+                VARENA_ASSERT(0 && "[VArena] You've used up all the memory available.");
                 return;
             }
 
@@ -128,4 +128,4 @@ uint8_t* varena_push(VArena* arena, const size_t num_bytes) {
 } // extern "C"
 #endif
 
-#endif // defined(ARENA_IMPLEMENTATION) && !defined(ARENA_H_IMPLEMENTED)
+#endif // defined(VARENA_IMPLEMENTATION) && !defined(VARENA_H_IMPLEMENTED)

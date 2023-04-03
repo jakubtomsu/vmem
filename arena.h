@@ -5,6 +5,7 @@
 
 #include "vmem.h"
 #include <stdint.h>
+#include <stddef.h> // size_t
 #include <assert.h>
 
 // Arena of virtual memory. Initialize with `arena_init` and deinitialize with `arena_deinit`.
@@ -28,7 +29,7 @@ extern "C" {
 
 // Reserve virtual memory of size `max_bytes` and initialize arena.
 Arena arena_init(const size_t max_bytes);
-// Free the memory and reset.
+// Dealloc the memory and reset.
 void arena_deinit(Arena* arena);
 size_t arena_calc_bytes_used_for_size(size_t cap);
 int arena_is_valid(Arena arena);
@@ -51,6 +52,7 @@ uint8_t* arena_push(Arena* arena, size_t num_bytes);
 
 #include "vmem.h"
 #include <stdint.h>
+#include <stddef.h> // size_t
 
 #if !defined(ARENA_ASSERT)
 #include <assert.h>
@@ -69,11 +71,12 @@ Arena arena_init(const size_t max_bytes) {
 }
 
 void arena_deinit(Arena* arena) {
-    vmem_free(arena->_buf, arena->_buf_len);
+    vmem_dealloc(arena->_buf, arena->_buf_len);
+    arena->_buf = 0;
 }
 
 static inline size_t arena_calc_bytes_used_for_size(const size_t cap) {
-    return vmem_align_forward(cap, vmem_get_allocation_granularity());
+    return vmem_align_forward(cap, vmem_get_page_size());
 }
 
 int arena_is_valid(const Arena arena) {
@@ -90,8 +93,9 @@ void arena_set_commited(Arena* arena, const size_t commited) {
         // Shrink
         if(commited < arena->_commited) {
             if(new_commited_bytes < current_commited_bytes) {
-                const size_t bytes_to_free = (size_t)((intptr_t)current_commited_bytes - (intptr_t)new_commited_bytes);
-                vmem_decommit(arena->_buf + new_commited_bytes, bytes_to_free);
+                const size_t bytes_to_dealloc =
+                    (size_t)((intptr_t)current_commited_bytes - (intptr_t)new_commited_bytes);
+                vmem_decommit(arena->_buf + new_commited_bytes, bytes_to_dealloc);
             }
         }
         // Expand

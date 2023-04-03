@@ -1,8 +1,3 @@
-// This is a simple program to demonstrate the API and test it's features for correctness.
-
-#define VMEM_ON_ERROR(opt_string) // Ignore for tests
-#define VMEM_IMPLEMENTATION
-#include "../vmem.h"
 #include "utest.h"
 #include <stdio.h>
 
@@ -19,10 +14,10 @@ UTEST(vmem, error_messages) {
     EXPECT_ERROR_WITH_VMEM_MSG(vmem_alloc_protect(1, Vmem_Protect_Invalid));
     EXPECT_ERROR_WITH_VMEM_MSG(vmem_alloc_protect(1, (Vmem_Protect)12345));
 
-    EXPECT_ERROR_WITH_VMEM_MSG(vmem_free(0, 0));
-    EXPECT_ERROR_WITH_VMEM_MSG(vmem_free(0, 123));
-    EXPECT_ERROR_WITH_VMEM_MSG(vmem_free((void*)1, 0));
-    EXPECT_ERROR_WITH_VMEM_MSG(vmem_free((void*)1, 1));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_dealloc(0, 0));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_dealloc(0, 123));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_dealloc((void*)1, 0));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_dealloc((void*)1, 1));
 
     EXPECT_ERROR_WITH_VMEM_MSG(vmem_lock(0, 0));
     EXPECT_ERROR_WITH_VMEM_MSG(vmem_lock(0, 123));
@@ -46,7 +41,7 @@ UTEST(vmem, error_messages) {
     EXPECT_ERROR_WITH_VMEM_MSG(vmem_align_backward(123, 3));
 }
 
-UTEST(funcs, common) {
+UTEST(vmem, common) {
     const int size = 1024 * 1024;
     void* ptr = vmem_alloc_protect(size, Vmem_Protect_ReadWrite);
     ASSERT_TRUE(ptr);
@@ -55,10 +50,10 @@ UTEST(funcs, common) {
     EXPECT_FALSE(vmem_protect(ptr, 1024, Vmem_Protect_Read));
     EXPECT_TRUE(vmem_commit(ptr, size));
 
-    ASSERT_TRUE(vmem_free(ptr, size));
+    ASSERT_TRUE(vmem_dealloc(ptr, size));
 }
 
-UTEST(funcs, protect) {
+UTEST(vmem, protect_func) {
     const int size = 1024 * 1024;
     void* ptr = vmem_alloc(size);
     ASSERT_TRUE(ptr);
@@ -73,10 +68,10 @@ UTEST(funcs, protect) {
     EXPECT_TRUE(vmem_protect(ptr, 1024, Vmem_Protect_ExecuteReadWrite));
     EXPECT_FALSE(vmem_protect(ptr, size, Vmem_Protect_ReadWrite));
 
-    ASSERT_TRUE(vmem_free(ptr, size));
+    ASSERT_TRUE(vmem_dealloc(ptr, size));
 }
 
-UTEST(funcs, lock) {
+UTEST(vmem, lock_func) {
     const int size = 1024 * 1024;
     void* ptr = vmem_alloc(size);
     ASSERT_TRUE(ptr);
@@ -97,48 +92,48 @@ UTEST(funcs, lock) {
     ASSERT_TRUE(vmem_commit_protect(ptr, 1024, Vmem_Protect_NoAccess));
     EXPECT_FALSE(vmem_lock(ptr, 1024));
 
-    ASSERT_TRUE(vmem_free(ptr, size));
+    ASSERT_TRUE(vmem_dealloc(ptr, size));
 }
 
-UTEST(funcs, page_size) {
+UTEST(vmem, page_size_func) {
     ASSERT_TRUE(vmem_get_page_size() > 0);
     ASSERT_TRUE(vmem_query_page_size() > 0);
     ASSERT_TRUE(vmem_query_page_size() == vmem_get_page_size());
 }
 
-UTEST(funcs, allocation_granularity) {
+UTEST(vmem, allocation_granularity) {
     ASSERT_TRUE(vmem_get_allocation_granularity() > 0);
     ASSERT_TRUE(vmem_query_allocation_granularity() > 0);
     ASSERT_TRUE(vmem_query_allocation_granularity() == vmem_get_allocation_granularity());
 }
 
-UTEST(perf, many_allocs_frees) {
+UTEST(vmem, many_allocs_deallocs_perf) {
     for(int i = 1; i < MANY; i++) {
         void* ptr = vmem_alloc(i);
         ASSERT_TRUE(ptr);
-        ASSERT_TRUE(vmem_free(ptr, i));
+        ASSERT_TRUE(vmem_dealloc(ptr, i));
     }
 }
 
-UTEST(perf, many_allocs_commits_frees) {
+UTEST(vmem, many_allocs_commits_deallocs_perf) {
     for(int i = 1; i < MANY; i++) {
         void* ptr = vmem_alloc(i);
         ASSERT_TRUE(ptr);
         ASSERT_TRUE(vmem_commit(ptr, i));
-        ASSERT_TRUE(vmem_free(ptr, i));
+        ASSERT_TRUE(vmem_dealloc(ptr, i));
     }
 }
 
-UTEST(perf, many_small_recommits) {
+UTEST(vmem, many_small_recommits_perf) {
     void* ptr = vmem_alloc(MANY);
     ASSERT_TRUE(ptr);
     for(int i = 1; i < MANY; i++) {
         ASSERT_TRUE(vmem_commit(ptr, i));
     }
-    ASSERT_TRUE(vmem_free(ptr, MANY));
+    ASSERT_TRUE(vmem_dealloc(ptr, MANY));
 }
 
-UTEST(perf, page_commits) {
+UTEST(vmem, page_commits_perf) {
     const int num_pages = 1000;
     const int size = num_pages * vmem_get_page_size();
     void* ptr = vmem_alloc(size);
@@ -146,7 +141,7 @@ UTEST(perf, page_commits) {
     for(int i = 1; i < num_pages; i++) {
         ASSERT_TRUE(vmem_commit(ptr, i * vmem_get_page_size()));
     }
-    ASSERT_TRUE(vmem_free(ptr, size));
+    ASSERT_TRUE(vmem_dealloc(ptr, size));
 }
 
 UTEST(vmem, overlapped_page) {
@@ -161,14 +156,7 @@ UTEST(vmem, overlapped_page) {
     ASSERT_TRUE(vmem_commit(ptr, size));
     ASSERT_TRUE(vmem_protect(ptr, size, Vmem_Protect_Read));
 
-    ASSERT_TRUE(vmem_free(ptr, size));
-}
-
-UTEST_STATE();
-
-int main(const int argc, const char* argv[]) {
-    vmem_init();
-    return utest_main(argc, argv);
+    ASSERT_TRUE(vmem_dealloc(ptr, size));
 }
 
 /*
@@ -215,7 +203,7 @@ static void print_allocation_info_win32(void* ptr, const size_t num_bytes_to_sca
         const char* state_str = "<Unknown>";
         switch(info.State) {
             case MEM_COMMIT: state_str = "COMMIT"; break;
-            case MEM_FREE: state_str = "FREE"; break;
+            case MEM_DEALLOC: state_str = "DEALLOC"; break;
             case MEM_RESERVE: state_str = "RESERVE"; break;
         }
 
@@ -274,7 +262,7 @@ static void print_allocation_info_win32(void* ptr, const size_t num_bytes_to_sca
             char overview_char = '?';
             switch(info.State) {
                 case MEM_COMMIT: overview_char = 'C'; break;
-                case MEM_FREE: overview_char = 'F'; break;
+                case MEM_DEALLOC: overview_char = 'F'; break;
                 case MEM_RESERVE: overview_char = 'r'; break;
             }
             for(int j = 0; j < region_pages; j++) {
@@ -295,7 +283,7 @@ static void print_allocation_info_win32(void* ptr, const size_t num_bytes_to_sca
         overview[sizeof(overview) - 1] = '\0';
     }
 
-    printf("\tPage state overview: (C: commited, F: free, r: reserved)\n\t\t%s\n", overview);
+    printf("\tPage state overview: (C: commited, F: dealloc, r: reserved)\n\t\t%s\n", overview);
 }
 #endif
 
@@ -336,7 +324,7 @@ int main() {
             ptr[i] = 0xff;
         }
 
-        vmem_free(ptr, SIZE);
+        vmem_dealloc(ptr, SIZE);
     }
 
     // Windows query virtual memory info
@@ -356,7 +344,7 @@ int main() {
 
         print_allocation_info_win32(ptr, SIZE);
 
-        vmem_free(ptr, SIZE);
+        vmem_dealloc(ptr, SIZE);
     }
 #endif
 
@@ -368,7 +356,7 @@ int main() {
         vmem_lock(ptr, SIZE);
         vmem_unlock(ptr, SIZE);
 
-        vmem_free(ptr, SIZE);
+        vmem_dealloc(ptr, SIZE);
     }
 
     // Protection
@@ -388,7 +376,7 @@ int main() {
         }
         printf("\n");
 
-        vmem_free(ptr, SIZE);
+        vmem_dealloc(ptr, SIZE);
     }
 
     // Huge allocation
@@ -408,7 +396,7 @@ int main() {
         print_allocation_info_win32(ptr, size);
 #endif
 
-        vmem_free(ptr, size);
+        vmem_dealloc(ptr, size);
     }
 
     return 0;

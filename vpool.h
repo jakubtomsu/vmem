@@ -16,6 +16,10 @@ typedef struct VPool {
     VPoolSlotIndex _first_unused_slot;
 } VPool;
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 VPool vpool_init(int total_slots, int slot_bytes);
 void vpool_deinit(VPool* pool);
 int vpool_is_valid(const VPool* pool);
@@ -26,10 +30,16 @@ void vpool_dealloc_slot(VPool* pool, VPoolSlotIndex index);
 void vpool_clear_and_decommit(VPool* pool);
 uint8_t* vpool_get_at_slot(VPool* pool, VPoolSlotIndex index);
 
+#if defined(__cplusplus)
+} // extern "C"
+#endif
+
+
+
 #if defined(__cplusplus) && !defined(VPOOL_NO_CPP_CONTAINER)
 #define VPOOL_CONTAINER
 
-// Type-safe wrapper around VPool.
+// Type-safe C++ wrapper around VPool.
 template<typename T>
 struct VPoolContainer {
     VPool _pool;

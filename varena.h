@@ -32,13 +32,48 @@ VArena varena_init(const size_t max_bytes);
 // Dealloc the memory and reset.
 void varena_deinit(VArena* arena);
 size_t varena_calc_bytes_used_for_size(size_t cap);
-int varena_is_valid(VArena arena);
+int varena_is_valid(const VArena* arena);
 void varena_set_commited(VArena* arena, size_t commited);
 uint8_t* varena_alloc(VArena* arena, size_t num_bytes);
 
 #if defined(__cplusplus)
 } // extern "C"
 #endif
+
+
+
+#if defined(__cplusplus) && !defined(VARENA_NO_CPP_CONTAINER)
+#define VARENA_CONTAINER
+
+// Type-safe C++ wrapper around VArena.
+template<typename T>
+struct VArenaContainer {
+    VArena _arena;
+
+    void init(const size_t max_items) {
+        _arena = varena_init(max_items * sizeof(T));
+    }
+
+    void deinit() {
+        varena_deinit(&_arena);
+    }
+
+    bool is_valid() {
+        return varena_is_valid(&_arena);
+    }
+
+    void set_commited(const size_t commited) {
+        varena_set_commited(&_arena, commited);
+    }
+
+    T* alloc(const size_t num_items) {
+        T* result = (T*)varena_alloc(&_arena, num_items * sizeof(T));
+        *result = {};
+        return result;
+    }
+};
+#endif // defined(__cplusplus) && !defined(VARENA_NO_CPP_CONTAINER)
+
 
 #endif // !defined(VARENA_H_INCLUDED)
 
@@ -79,8 +114,8 @@ static inline size_t varena_calc_bytes_used_for_size(const size_t cap) {
     return vmem_align_forward(cap, vmem_get_page_size());
 }
 
-int varena_is_valid(const VArena arena) {
-    return arena._buf != 0 && arena._buf_len > 0;
+int varena_is_valid(const VArena* arena) {
+    return arena->_buf != 0 && arena->_buf_len > 0;
 }
 
 void varena_set_commited(VArena* arena, const size_t commited) {

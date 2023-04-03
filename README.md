@@ -48,9 +48,11 @@ Tests use the [utest.h](https://github.com/sheredom/utest.h) library.
 
 ### Build tests
 ```bash
-# you can replace clang with 'gcc', 'zig cc' etc.
-# Compiles fine with '-Wall -Werror'.
-clang vmem_test.cpp -o vmem_test.exe
+# Note: you can replace clang with 'gcc', 'zig cc' etc.
+clang tests/test.c -o test.exe
+# Other options
+clang++ -x c++ test/test.c -o test.exe -Wall -Werror -fsanitize=address,undefined -std=c++20
+clang test/test.c -o test.exe -Wall -Werror -fsanitize=address,undefined -std=c99
 ```
 Or in `x64 Developer Command Prompt` on windows, using MSVC:
 ```bash

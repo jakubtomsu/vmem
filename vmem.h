@@ -93,7 +93,7 @@ VMEM_FUNC void vmem_init();
 VMEM_FUNC void* vmem_alloc_protect(Vmem_Size num_bytes, Vmem_Protect protect);
 
 // Reserves (allocates but doesn't commit) a block of virtual address-space of size `num_bytes`, in ReadWrite protection
-// mode. The memory is zeroed. Free with `vmem_free`. Note: you must commit the memory before using it.
+// mode. The memory is zeroed. Dealloc with `vmem_dealloc`. Note: you must commit the memory before using it.
 // To maximize efficiency, try to always use a multiple of allocation granularity (see
 // `vmem_get_allocation_granularity`) for size of allocations.
 // @param num_bytes: total size of the memory block.
@@ -102,11 +102,11 @@ static VMEM_INLINE void* vmem_alloc(const Vmem_Size num_bytes) {
     return vmem_alloc_protect(num_bytes, Vmem_Protect_ReadWrite);
 }
 
-// Frees (releases) a block of virtual memory.
+// Deallocs (releases) a block of virtual memory.
 // @param alloc_ptr: a pointer to the start of the memory block. Result of `vmem_alloc`.
 // @param num_allocated_bytes: *must* be the value returned by `vmem_alloc`.
 //  It isn't used on windows, but it's required on unix platforms.
-VMEM_FUNC Vmem_Result vmem_free(void* alloc_ptr, Vmem_Size num_allocated_bytes);
+VMEM_FUNC Vmem_Result vmem_dealloc(void* alloc_ptr, Vmem_Size num_allocated_bytes);
 
 // Commit memory pages which contain one or more bytes in [ptr...ptr+num_bytes]. The pages will be mapped to physical
 // memory.
@@ -206,6 +206,8 @@ VMEM_FUNC uintptr_t vmem_align_backward(const uintptr_t address, const int align
 #if defined(VMEM_IMPLEMENTATION) && !defined(VMEM_H_IMPLEMENTED)
 #define VMEM_H_IMPLEMENTED
 
+#define _CRT_SECURE_NO_WARNINGS 1
+
 #if !defined(VMEM_UNUSED)
 #define VMEM_UNUSED(varible) (void)(varible)
 #endif
@@ -294,7 +296,12 @@ VMEM_FUNC Vmem_Size vmem_get_allocation_granularity() {
 VMEM_THREAD_LOCAL char vmem__g_error_message[1024] = {};
 
 static void vmem__write_error_message(const char* str) {
-    strncpy(vmem__g_error_message, str, sizeof(vmem__g_error_message));
+    int i = 0;
+    for(; i < sizeof(vmem__g_error_message); i++) {
+        if(str[i] == 0) break;
+        vmem__g_error_message[i] = str[i];
+    }
+    vmem__g_error_message[i] = 0;
 }
 
 VMEM_FUNC const char* vmem_get_error_message() {
@@ -385,11 +392,11 @@ VMEM_FUNC void* vmem_alloc_protect(const Vmem_Size num_bytes, const Vmem_Protect
     return 0;
 }
 
-VMEM_FUNC Vmem_Result vmem_free(void* ptr, const Vmem_Size num_allocated_bytes) {
+VMEM_FUNC Vmem_Result vmem_dealloc(void* ptr, const Vmem_Size num_allocated_bytes) {
     VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
     VMEM_ERROR_IF(
         num_allocated_bytes == 0,
-        vmem__write_error_message("Cannot free a memory block of size 0 (num_allocated_bytes is 0)."));
+        vmem__write_error_message("Cannot dealloc a memory block of size 0 (num_allocated_bytes is 0)."));
 
     const BOOL result = VirtualFree(ptr, 0, MEM_RELEASE);
     VMEM_ERROR_IF(result == 0, vmem__write_win32_error_message());
@@ -504,11 +511,11 @@ VMEM_FUNC void* vmem_alloc_protect(const Vmem_Size num_bytes, const Vmem_Protect
     return 0; // Vmem_Result_Error
 }
 
-VMEM_FUNC Vmem_Result vmem_free(void* ptr, const Vmem_Size num_allocated_bytes) {
+VMEM_FUNC Vmem_Result vmem_dealloc(void* ptr, const Vmem_Size num_allocated_bytes) {
     VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
     VMEM_ERROR_IF(
         num_allocated_bytes == 0,
-        vmem__write_error_message("Cannot free a memory block of size 0 (num_allocated_bytes is 0)."));
+        vmem__write_error_message("Cannot dealloc a memory block of size 0 (num_allocated_bytes is 0)."));
 
     const int result = munmap(ptr, num_allocated_bytes);
     VMEM_ERROR_IF(result != 0, vmem__write_linux_error_reason());
@@ -578,8 +585,6 @@ VMEM_FUNC Vmem_Result vmem_unlock(void* ptr, const Vmem_Size num_bytes) {
 #endif // defined(VMEM_IMPLEMENTATION) && !defined(VMEM_H_IMPLEMENTED)
 
 /*
-------------------------------------------------------------------------------
-This software is available under 2 licenses -- choose whichever you prefer.
 ------------------------------------------------------------------------------
 ALTERNATIVE A - MIT License
 Copyright (c) 2023 Jakub Tomšů

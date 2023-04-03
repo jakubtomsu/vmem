@@ -28,9 +28,9 @@ vmem_commit(ptr, 2048);
 
 // do something with the data, now you can use bytes in [0..<2048]
 
-// When you don't need the whole memory block you can free it.
+// When you don't need the whole memory block you can dealloc it.
 // To just mark it as unused, use `vmem_decommit` instead.
-vmem_free(ptr, size);
+vmem_dealloc(ptr, size);
 ```
 
 ## Supported platforms
@@ -72,8 +72,8 @@ Example of dealing with errors:
 #include <stdio.h> // printf
 
 int main() {
-    if(!vmem_free(0, 0)) {
-        printf("vmem_free failed with message: %s\n", vmem_get_error_message());
+    if(!vmem_dealloc(0, 0)) {
+        printf("vmem_dealloc failed with message: %s\n", vmem_get_error_message());
         // Handle the error ...
     }
     return 0;

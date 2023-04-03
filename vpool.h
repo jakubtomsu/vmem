@@ -68,7 +68,7 @@ struct VPoolContainer {
 VPool vpool_init(int total_slots, int slot_size_bytes) {
     assert(slot_size_bytes >= sizeof(VPoolSlotIndex));
     VPool result = {0};
-    result._buf = vmem_alloc(total_slots * slot_size_bytes);
+    result._buf = (uint8_t*)vmem_alloc(total_slots * slot_size_bytes);
     result._total_slots = total_slots;
     result._slot_size_bytes = slot_size_bytes;
     result._first_unused_slot = VPOOL_SLOT_INDEX_INVALID;
@@ -144,7 +144,7 @@ uint8_t* vpool_alloc(VPool* pool) {
         index = pool->_head_slot;
         pool->_head_slot++;
     }
-    return vpool__index_to_ptr(pool, index);
+    return (uint8_t*)vpool__index_to_ptr(pool, index);
 }
 
 void vpool_dealloc(VPool* pool, void* slot_ptr) {

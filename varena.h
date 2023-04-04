@@ -27,10 +27,7 @@ typedef struct VArena {
 extern "C" {
 #endif
 
-// Reserve virtual memory of size `max_bytes` and initialize arena.
-VArena varena_init(const size_t max_bytes);
-// Dealloc the memory and reset.
-void varena_deinit(VArena* arena);
+VArena varena_init(void* vptr, size_t num_bytes);
 size_t varena_calc_bytes_used_for_size(size_t cap);
 int varena_is_valid(const VArena* arena);
 void varena_set_commited(VArena* arena, size_t commited);
@@ -98,16 +95,11 @@ struct VArenaContainer {
 extern "C" {
 #endif
 
-VArena varena_init(const size_t max_bytes) {
+VArena varena_init(void* vptr, size_t num_bytes) {
     VArena result = {};
-    result._buf = (uint8_t*)vmem_alloc(max_bytes);
-    result._buf_len = max_bytes;
+    result._buf = (uint8_t*)vptr;
+    result._buf_len = num_bytes;
     return result;
-}
-
-void varena_deinit(VArena* arena) {
-    vmem_dealloc(arena->_buf, arena->_buf_len);
-    arena->_buf = 0;
 }
 
 static inline size_t varena_calc_bytes_used_for_size(const size_t cap) {

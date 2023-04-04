@@ -347,7 +347,7 @@ VMEM_FUNC uintptr_t vmem_align_backward(const uintptr_t address, const int align
     return vmem_align_backward_fast(address, align);
 }
 
-VMEM_FUNC uintptr_t vmem_is_aligned(const uintptr_t address, const int align) {
+VMEM_FUNC VMemResult vmem_is_aligned(const uintptr_t address, const int align) {
     VMEM_ERROR_IF(align == 0, vmem__write_error_message("Alignment cannot be zero."));
     VMEM_ERROR_IF((align & (align - 1)) != 0, vmem__write_error_message("Alignment has to be a power of 2."));
     return vmem_is_aligned_fast(address, align);

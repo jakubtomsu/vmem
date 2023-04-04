@@ -159,7 +159,7 @@ VPoolSlotIndex vpool_alloc_slot(VPool* pool) {
 
 uint8_t* vpool_alloc(VPool* pool) {
     const VPoolSlotIndex index = vpool_alloc_slot(pool);
-    return vpool__index_to_ptr(pool, index);
+    return (uint8_t*)vpool__index_to_ptr(pool, index);
 }
 
 static inline void vpool__dealloc_slot_with_ptr(VPool* pool, const VPoolSlotIndex index, const void* ptr) {

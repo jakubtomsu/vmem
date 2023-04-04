@@ -60,7 +60,7 @@ cl vmem_test.cpp /Fevmem_test.exe
 ```
 
 ## Error mangement
-If a function fails, it returns a `Vmem_Result_Error` (which is 0/false).
+If a function fails, it returns a `VMemResult_Error` (which is 0/false).
 You can get a string message about the error reason by calling `vmem_get_error_message`.
 
 But by default, each error calls `assert(0)` from C standard library before returning.

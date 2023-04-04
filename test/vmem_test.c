@@ -11,8 +11,8 @@ UTEST(vmem, error_messages) {
     EXPECT_ERROR_WITH_VMEM_MSG(vmem_alloc(0));
     EXPECT_ERROR_WITH_VMEM_MSG(vmem_alloc(~0));
 
-    EXPECT_ERROR_WITH_VMEM_MSG(vmem_alloc_protect(1, Vmem_Protect_Invalid));
-    EXPECT_ERROR_WITH_VMEM_MSG(vmem_alloc_protect(1, (Vmem_Protect)12345));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_alloc_protect(1, VMemProtect_Invalid));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_alloc_protect(1, (VMemProtect)12345));
 
     EXPECT_ERROR_WITH_VMEM_MSG(vmem_dealloc(0, 0));
     EXPECT_ERROR_WITH_VMEM_MSG(vmem_dealloc(0, 123));
@@ -29,10 +29,10 @@ UTEST(vmem, error_messages) {
     EXPECT_ERROR_WITH_VMEM_MSG(vmem_unlock((void*)1, 0));
     EXPECT_ERROR_WITH_VMEM_MSG(vmem_unlock((void*)1, 1));
 
-    EXPECT_ERROR_WITH_VMEM_MSG(vmem_protect(0, 0, Vmem_Protect_ReadWrite));
-    EXPECT_ERROR_WITH_VMEM_MSG(vmem_protect(0, 123, Vmem_Protect_ReadWrite));
-    EXPECT_ERROR_WITH_VMEM_MSG(vmem_protect((void*)1, 0, Vmem_Protect_ReadWrite));
-    EXPECT_ERROR_WITH_VMEM_MSG(vmem_protect((void*)1, 1, Vmem_Protect_ReadWrite));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_protect(0, 0, VMemProtect_ReadWrite));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_protect(0, 123, VMemProtect_ReadWrite));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_protect((void*)1, 0, VMemProtect_ReadWrite));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_protect((void*)1, 1, VMemProtect_ReadWrite));
 
     EXPECT_ERROR_WITH_VMEM_MSG(vmem_align_forward(123, 0));
     EXPECT_ERROR_WITH_VMEM_MSG(vmem_align_forward(123, 3));
@@ -43,11 +43,11 @@ UTEST(vmem, error_messages) {
 
 UTEST(vmem, common) {
     const int size = 1024 * 1024;
-    void* ptr = vmem_alloc_protect(size, Vmem_Protect_ReadWrite);
+    void* ptr = vmem_alloc_protect(size, VMemProtect_ReadWrite);
     ASSERT_TRUE(ptr);
 
     EXPECT_FALSE(vmem_lock(ptr, 1024));
-    EXPECT_FALSE(vmem_protect(ptr, 1024, Vmem_Protect_Read));
+    EXPECT_FALSE(vmem_protect(ptr, 1024, VMemProtect_Read));
     EXPECT_TRUE(vmem_commit(ptr, size));
 
     ASSERT_TRUE(vmem_dealloc(ptr, size));
@@ -57,16 +57,16 @@ UTEST(vmem, protect_func) {
     const int size = 1024 * 1024;
     void* ptr = vmem_alloc(size);
     ASSERT_TRUE(ptr);
-    ASSERT_FALSE(vmem_protect(ptr, size, Vmem_Protect_Read));
+    ASSERT_FALSE(vmem_protect(ptr, size, VMemProtect_Read));
     ASSERT_TRUE(vmem_commit(ptr, 1024));
 
-    EXPECT_TRUE(vmem_protect(ptr, 1024, Vmem_Protect_NoAccess));
-    EXPECT_TRUE(vmem_protect(ptr, 1024, Vmem_Protect_Read));
-    EXPECT_TRUE(vmem_protect(ptr, 1024, Vmem_Protect_ReadWrite));
-    EXPECT_TRUE(vmem_protect(ptr, 1024, Vmem_Protect_Execute));
-    EXPECT_TRUE(vmem_protect(ptr, 1024, Vmem_Protect_ExecuteRead));
-    EXPECT_TRUE(vmem_protect(ptr, 1024, Vmem_Protect_ExecuteReadWrite));
-    EXPECT_FALSE(vmem_protect(ptr, size, Vmem_Protect_ReadWrite));
+    EXPECT_TRUE(vmem_protect(ptr, 1024, VMemProtect_NoAccess));
+    EXPECT_TRUE(vmem_protect(ptr, 1024, VMemProtect_Read));
+    EXPECT_TRUE(vmem_protect(ptr, 1024, VMemProtect_ReadWrite));
+    EXPECT_TRUE(vmem_protect(ptr, 1024, VMemProtect_Execute));
+    EXPECT_TRUE(vmem_protect(ptr, 1024, VMemProtect_ExecuteRead));
+    EXPECT_TRUE(vmem_protect(ptr, 1024, VMemProtect_ExecuteReadWrite));
+    EXPECT_FALSE(vmem_protect(ptr, size, VMemProtect_ReadWrite));
 
     ASSERT_TRUE(vmem_dealloc(ptr, size));
 }
@@ -89,7 +89,7 @@ UTEST(vmem, lock_func) {
     EXPECT_FALSE(vmem_lock(ptr, 1024));
     ASSERT_TRUE(vmem_commit(ptr, 1024));
     EXPECT_TRUE(vmem_lock(ptr, 1024));
-    ASSERT_TRUE(vmem_commit_protect(ptr, 1024, Vmem_Protect_NoAccess));
+    ASSERT_TRUE(vmem_commit_protect(ptr, 1024, VMemProtect_NoAccess));
     EXPECT_FALSE(vmem_lock(ptr, 1024));
 
     ASSERT_TRUE(vmem_dealloc(ptr, size));
@@ -151,10 +151,10 @@ UTEST(vmem, overlapped_page) {
 
     ASSERT_TRUE(vmem_commit(ptr, vmem_get_page_size()));
     // This should error because only the first page should be commited.
-    ASSERT_FALSE(vmem_protect(ptr + vmem_get_page_size(), vmem_get_page_size(), Vmem_Protect_Read));
+    ASSERT_FALSE(vmem_protect(ptr + vmem_get_page_size(), vmem_get_page_size(), VMemProtect_Read));
 
     ASSERT_TRUE(vmem_commit(ptr, size));
-    ASSERT_TRUE(vmem_protect(ptr, size, Vmem_Protect_Read));
+    ASSERT_TRUE(vmem_protect(ptr, size, VMemProtect_Read));
 
     ASSERT_TRUE(vmem_dealloc(ptr, size));
 }
@@ -361,15 +361,15 @@ int main() {
 
     // Protection
     {
-        uint64_t* ptr = (uint64_t*)vmem_alloc_protect(SIZE, Vmem_Protect_NoAccess);
+        uint64_t* ptr = (uint64_t*)vmem_alloc_protect(SIZE, VMemProtect_NoAccess);
 
-        vmem_commit_protect(ptr, SIZE, Vmem_Protect_ReadWrite);
+        vmem_commit_protect(ptr, SIZE, VMemProtect_ReadWrite);
 
         for(int i = 0; i < 200; i++) {
             ptr[i] = i;
         }
 
-        vmem_set_protect(ptr, SIZE, Vmem_Protect_Read);
+        vmem_set_protect(ptr, SIZE, VMemProtect_Read);
 
         for(int i = 0; i < 200; i++) {
             printf("%llx ", ptr[i]);

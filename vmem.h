@@ -56,27 +56,27 @@
 extern "C" {
 #endif
 
-typedef size_t Vmem_Size;
-typedef uint8_t Vmem_Protect;
-// Success/Error result (Vmem_Result_).
+typedef size_t VMemSize;
+typedef uint8_t VMemProtect;
+// Success/Error result (VMemResult_).
 // You can use this in an if statement: if(vmem_commit(...)) { do something... }
-typedef int Vmem_Result;
+typedef int VMemResult;
 
-typedef enum Vmem_Result_ {
-    Vmem_Result_Error = 0,   // false
-    Vmem_Result_Success = 1, // true
-} Vmem_Result_;
+typedef enum VMemResult_ {
+    VMemResult_Error = 0,   // false
+    VMemResult_Success = 1, // true
+} VMemResult_;
 
-typedef enum Vmem_Protect_ {
-    Vmem_Protect_Invalid = 0,
-    Vmem_Protect_NoAccess,         // The page memory cannot be accessed at all.
-    Vmem_Protect_Read,             // You can only read from the page memory .
-    Vmem_Protect_ReadWrite,        // You can read and write to the page memory. This is the most common option.
-    Vmem_Protect_Execute,          // You can only execute the page memory .
-    Vmem_Protect_ExecuteRead,      // You can execute the page memory and read from it.
-    Vmem_Protect_ExecuteReadWrite, // You can execute the page memory and read/write to it.
-    Vmem_Protect_COUNT,
-} Vmem_Protect_;
+typedef enum VMemProtect_ {
+    VMemProtect_Invalid = 0,
+    VMemProtect_NoAccess,         // The page memory cannot be accessed at all.
+    VMemProtect_Read,             // You can only read from the page memory .
+    VMemProtect_ReadWrite,        // You can read and write to the page memory. This is the most common option.
+    VMemProtect_Execute,          // You can only execute the page memory .
+    VMemProtect_ExecuteRead,      // You can execute the page memory and read from it.
+    VMemProtect_ExecuteReadWrite, // You can execute the page memory and read/write to it.
+    VMemProtect_COUNT,
+} VMemProtect_;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Public API
@@ -90,7 +90,7 @@ VMEM_FUNC void vmem_init();
 
 // Reserves (allocates but doesn't commit) a block of virtual address-space of size `num_bytes`.
 // @returns 0 on error, start address of the allocated memory block on success.
-VMEM_FUNC void* vmem_alloc_protect(Vmem_Size num_bytes, Vmem_Protect protect);
+VMEM_FUNC void* vmem_alloc_protect(VMemSize num_bytes, VMemProtect protect);
 
 // Reserves (allocates but doesn't commit) a block of virtual address-space of size `num_bytes`, in ReadWrite protection
 // mode. The memory is zeroed. Dealloc with `vmem_dealloc`. Note: you must commit the memory before using it.
@@ -98,15 +98,15 @@ VMEM_FUNC void* vmem_alloc_protect(Vmem_Size num_bytes, Vmem_Protect protect);
 // `vmem_get_allocation_granularity`) for size of allocations.
 // @param num_bytes: total size of the memory block.
 // @returns 0 on error, start address of the allocated memory block on success.
-static VMEM_INLINE void* vmem_alloc(const Vmem_Size num_bytes) {
-    return vmem_alloc_protect(num_bytes, Vmem_Protect_ReadWrite);
+static VMEM_INLINE void* vmem_alloc(const VMemSize num_bytes) {
+    return vmem_alloc_protect(num_bytes, VMemProtect_ReadWrite);
 }
 
 // Deallocs (releases) a block of virtual memory.
 // @param alloc_ptr: a pointer to the start of the memory block. Result of `vmem_alloc`.
 // @param num_allocated_bytes: *must* be the value returned by `vmem_alloc`.
 //  It isn't used on windows, but it's required on unix platforms.
-VMEM_FUNC Vmem_Result vmem_dealloc(void* alloc_ptr, Vmem_Size num_allocated_bytes);
+VMEM_FUNC VMemResult vmem_dealloc(void* alloc_ptr, VMemSize num_allocated_bytes);
 
 // Commit memory pages which contain one or more bytes in [ptr...ptr+num_bytes]. The pages will be mapped to physical
 // memory.
@@ -114,78 +114,78 @@ VMEM_FUNC Vmem_Result vmem_dealloc(void* alloc_ptr, Vmem_Size num_allocated_byte
 // @param ptr: pointer to the pointer returned by `vmem_alloc` or shifted by [0...num_bytes].
 // @param num_bytes: number of bytes to commit.
 // @param protect: protection mode for the newly commited pages.
-VMEM_FUNC Vmem_Result vmem_commit_protect(void* ptr, Vmem_Size num_bytes, Vmem_Protect protect);
+VMEM_FUNC VMemResult vmem_commit_protect(void* ptr, VMemSize num_bytes, VMemProtect protect);
 
 // Commit memory pages which contain one or more bytes in [ptr...ptr+num_bytes]. The pages will be mapped to physical
 // memory. The page protection mode will be changed to ReadWrite. Use `vmem_commit_protect` to specify a different mode.
 // Decommit with `vmem_decommit`.
 // @param ptr: pointer to the pointer returned by `vmem_alloc` or shifted by [0...num_bytes].
 // @param num_bytes: number of bytes to commit.
-static VMEM_INLINE Vmem_Result vmem_commit(void* ptr, const Vmem_Size num_bytes) {
-    return vmem_commit_protect(ptr, num_bytes, Vmem_Protect_ReadWrite);
+static VMEM_INLINE VMemResult vmem_commit(void* ptr, const VMemSize num_bytes) {
+    return vmem_commit_protect(ptr, num_bytes, VMemProtect_ReadWrite);
 }
 
 // Decommits the memory pages which contain one or more bytes in [ptr...ptr+num_bytes]. The pages will be unmapped from
 // physical memory.
 // @param ptr: pointer to the pointer returned by `vmem_alloc` or shifted by [0...num_bytes].
 // @param num_bytes: number of bytes to decommit.
-VMEM_FUNC Vmem_Result vmem_decommit(void* ptr, Vmem_Size num_bytes);
+VMEM_FUNC VMemResult vmem_decommit(void* ptr, VMemSize num_bytes);
 
 // Sets protection mode for the region of pages. All of the pages must be commited.
-VMEM_FUNC Vmem_Result vmem_protect(void* ptr, Vmem_Size num_bytes, Vmem_Protect protect);
+VMEM_FUNC VMemResult vmem_protect(void* ptr, VMemSize num_bytes, VMemProtect protect);
 
 // @returns cached value from `vmem_query_page_size`
-VMEM_FUNC Vmem_Size vmem_get_page_size();
+VMEM_FUNC VMemSize vmem_get_page_size();
 
 // Query the page size from the system. Usually something like 4096 bytes.
 // @returns the page size in number bytes. Cannot fail.
-VMEM_FUNC Vmem_Size vmem_query_page_size();
+VMEM_FUNC VMemSize vmem_query_page_size();
 
 // @returns cached value from `vmem_query_allocation_granularity`
-VMEM_FUNC Vmem_Size vmem_get_allocation_granularity();
+VMEM_FUNC VMemSize vmem_get_allocation_granularity();
 
 // Query the allocation granularity (alignment of each allocation) from the system.
 // Usually 65KB on Windows and 4KB on linux (on linux it's page size).
 // @returns allocation granularity in bytes.
-VMEM_FUNC Vmem_Size vmem_query_allocation_granularity();
+VMEM_FUNC VMemSize vmem_query_allocation_granularity();
 
 // Locks the specified region of the process's virtual address space into physical memory, ensuring that subsequent
 // access to the region will not incur a page fault.
 // All pages in the specified region must be commited.
-// You cannot lock pages with `Vmem_Protect_NoAccess`.
-VMEM_FUNC Vmem_Result vmem_lock(void* ptr, Vmem_Size num_bytes);
+// You cannot lock pages with `VMemProtect_NoAccess`.
+VMEM_FUNC VMemResult vmem_lock(void* ptr, VMemSize num_bytes);
 
 // Unlocks a specified range of pages in the virtual address space of a process, enabling the system to swap the pages
 // out to the paging file if necessary.
 // If you try to unlock pages which aren't locked, this will fail.
-VMEM_FUNC Vmem_Result vmem_unlock(void* ptr, Vmem_Size num_bytes);
+VMEM_FUNC VMemResult vmem_unlock(void* ptr, VMemSize num_bytes);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Utilities
 //
 
-// This will return the last message after a function fails (Vmem_Result_Error).
+// This will return the last message after a function fails (VMemResult_Error).
 VMEM_FUNC const char* vmem_get_error_message();
 
 // Returns a static string for the protection mode.
-// e.g. Vmem_Protect_ReadWrite will return "ReadWrite".
+// e.g. VMemProtect_ReadWrite will return "ReadWrite".
 // Never fails - unknown values return "<Unknown>", never null pointer.
-VMEM_FUNC const char* vmem_get_protect_name(Vmem_Protect protect);
+VMEM_FUNC const char* vmem_get_protect_name(VMemProtect protect);
 
 // Round the `address` up to the next (or current) aligned address.
 // @param address: Memory address to align.
 // @param align: Address alignment. Must be a power of 2 and greater than 0.
-// @returns aligned address on success, Vmem_Result_Error on error.
+// @returns aligned address on success, VMemResult_Error on error.
 VMEM_FUNC uintptr_t vmem_align_forward(const uintptr_t address, const int align);
 
 // Round the `address` down to the previous (or current) aligned address.
 // @param address: Memory address to align.
 // @param align: Address alignment. Must be a power of 2 and greater than 0.
-// @returns aligned address on success, Vmem_Result_Error on error.
+// @returns aligned address on success, VMemResult_Error on error.
 VMEM_FUNC uintptr_t vmem_align_backward(const uintptr_t address, const int align);
 
 // Check if an address is a multiple of `align`.
-VMEM_FUNC Vmem_Result vmem_is_aligned(const uintptr_t address, const int align);
+VMEM_FUNC VMemResult vmem_is_aligned(const uintptr_t address, const int align);
 
 // Faster version of `vmem_align_forward`, because it doesn't do any error checking and can be inlined.
 static inline uintptr_t vmem_align_forward_fast(const uintptr_t address, const int align) {
@@ -200,7 +200,7 @@ static inline uintptr_t vmem_align_backward_fast(const uintptr_t address, const 
 
 // Faster version of `vmem_is_aligned`, because it doesn't do any error checking and can be inlined.
 // The alignment must be a power of 2.
-static inline Vmem_Result vmem_is_aligned_fast(const uintptr_t address, const int align) {
+static inline VMemResult vmem_is_aligned_fast(const uintptr_t address, const int align) {
     return (address & (address - 1)) == 0;
 }
 
@@ -295,8 +295,8 @@ extern "C" {
 #endif
 
 // Cached global page size.
-static Vmem_Size vmem__g_page_size = 0;
-static Vmem_Size vmem__g_allocation_granularity = 0;
+static VMemSize vmem__g_page_size = 0;
+static VMemSize vmem__g_allocation_granularity = 0;
 
 VMEM_FUNC void vmem_init() {
     // Note: this will be 2 syscalls on windows.
@@ -304,11 +304,11 @@ VMEM_FUNC void vmem_init() {
     vmem__g_allocation_granularity = vmem_query_allocation_granularity();
 }
 
-VMEM_FUNC Vmem_Size vmem_get_page_size() {
+VMEM_FUNC VMemSize vmem_get_page_size() {
     return vmem__g_page_size;
 }
 
-VMEM_FUNC Vmem_Size vmem_get_allocation_granularity() {
+VMEM_FUNC VMemSize vmem_get_allocation_granularity() {
     return vmem__g_allocation_granularity;
 }
 
@@ -353,15 +353,15 @@ VMEM_FUNC uintptr_t vmem_is_aligned(const uintptr_t address, const int align) {
     return vmem_is_aligned_fast(address, align);
 }
 
-VMEM_FUNC const char* vmem_get_protect_name(const Vmem_Protect protect) {
+VMEM_FUNC const char* vmem_get_protect_name(const VMemProtect protect) {
     switch(protect) {
-        case Vmem_Protect_Invalid: return "INVALID";
-        case Vmem_Protect_NoAccess: return "NoAccess";
-        case Vmem_Protect_Read: return "Read";
-        case Vmem_Protect_ReadWrite: return "ReadWrite";
-        case Vmem_Protect_Execute: return "Execute";
-        case Vmem_Protect_ExecuteRead: return "ExecuteRead";
-        case Vmem_Protect_ExecuteReadWrite: return "ExecuteReadWrite";
+        case VMemProtect_Invalid: return "INVALID";
+        case VMemProtect_NoAccess: return "NoAccess";
+        case VMemProtect_Read: return "Read";
+        case VMemProtect_ReadWrite: return "ReadWrite";
+        case VMemProtect_Execute: return "Execute";
+        case VMemProtect_ExecuteRead: return "ExecuteRead";
+        case VMemProtect_ExecuteReadWrite: return "ExecuteReadWrite";
     }
     return "<Unknown>";
 }
@@ -370,17 +370,17 @@ VMEM_FUNC const char* vmem_get_protect_name(const Vmem_Protect protect) {
 // Windows implementation
 //
 #if defined(VMEM_PLATFORM_WIN32)
-static DWORD vmem__win32_protect(const Vmem_Protect protect) {
+static DWORD vmem__win32_protect(const VMemProtect protect) {
     switch(protect) {
-        case Vmem_Protect_NoAccess: return PAGE_NOACCESS;
-        case Vmem_Protect_Read: return PAGE_READONLY;
-        case Vmem_Protect_ReadWrite: return PAGE_READWRITE;
-        case Vmem_Protect_Execute: return PAGE_EXECUTE;
-        case Vmem_Protect_ExecuteRead: return PAGE_EXECUTE_READ;
-        case Vmem_Protect_ExecuteReadWrite: return PAGE_EXECUTE_READWRITE;
+        case VMemProtect_NoAccess: return PAGE_NOACCESS;
+        case VMemProtect_Read: return PAGE_READONLY;
+        case VMemProtect_ReadWrite: return PAGE_READWRITE;
+        case VMemProtect_Execute: return PAGE_EXECUTE;
+        case VMemProtect_ExecuteRead: return PAGE_EXECUTE_READ;
+        case VMemProtect_ExecuteReadWrite: return PAGE_EXECUTE_READWRITE;
     }
     vmem__write_error_message("Invalid protect mode.");
-    return Vmem_Result_Error;
+    return VMemResult_Error;
 }
 
 #if !defined(VMEM_NO_ERROR_MESSAGES)
@@ -403,7 +403,7 @@ static void vmem__write_win32_error_message() {
 }
 #endif
 
-VMEM_FUNC void* vmem_alloc_protect(const Vmem_Size num_bytes, const Vmem_Protect protect) {
+VMEM_FUNC void* vmem_alloc_protect(const VMemSize num_bytes, const VMemProtect protect) {
     VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Cannot allocate memory block with size 0 bytes."));
 
     const DWORD protect_win32 = vmem__win32_protect(protect);
@@ -417,7 +417,7 @@ VMEM_FUNC void* vmem_alloc_protect(const Vmem_Size num_bytes, const Vmem_Protect
     return 0;
 }
 
-VMEM_FUNC Vmem_Result vmem_dealloc(void* ptr, const Vmem_Size num_allocated_bytes) {
+VMEM_FUNC VMemResult vmem_dealloc(void* ptr, const VMemSize num_allocated_bytes) {
     VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
     VMEM_ERROR_IF(
         num_allocated_bytes == 0,
@@ -425,65 +425,65 @@ VMEM_FUNC Vmem_Result vmem_dealloc(void* ptr, const Vmem_Size num_allocated_byte
 
     const BOOL result = VirtualFree(ptr, 0, MEM_RELEASE);
     VMEM_ERROR_IF(result == 0, vmem__write_win32_error_message());
-    return Vmem_Result_Success;
+    return VMemResult_Success;
 }
 
-VMEM_FUNC Vmem_Result vmem_commit_protect(void* ptr, const Vmem_Size num_bytes, const Vmem_Protect protect) {
+VMEM_FUNC VMemResult vmem_commit_protect(void* ptr, const VMemSize num_bytes, const VMemProtect protect) {
     VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
     VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes cannot be null."));
 
     const LPVOID result = VirtualAlloc(ptr, num_bytes, MEM_COMMIT, vmem__win32_protect(protect));
     VMEM_ERROR_IF(result == 0, vmem__write_win32_error_message());
-    return Vmem_Result_Success;
+    return VMemResult_Success;
 }
 
-VMEM_FUNC Vmem_Result vmem_decommit(void* ptr, const Vmem_Size num_bytes) {
+VMEM_FUNC VMemResult vmem_decommit(void* ptr, const VMemSize num_bytes) {
     VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
     VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes cannot be null."));
 
     const BOOL result = VirtualFree(ptr, num_bytes, MEM_DECOMMIT);
     VMEM_ERROR_IF(result == 0, vmem__write_win32_error_message());
-    return Vmem_Result_Success;
+    return VMemResult_Success;
 }
 
-VMEM_FUNC Vmem_Result vmem_protect(void* ptr, const Vmem_Size num_bytes, const Vmem_Protect protect) {
+VMEM_FUNC VMemResult vmem_protect(void* ptr, const VMemSize num_bytes, const VMemProtect protect) {
     VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
     VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes cannot be null."));
 
     DWORD old_protect = 0;
     const BOOL result = VirtualProtect(ptr, num_bytes, vmem__win32_protect(protect), &old_protect);
     VMEM_ERROR_IF(result == 0, vmem__write_win32_error_message());
-    return Vmem_Result_Success;
+    return VMemResult_Success;
 }
 
-VMEM_FUNC Vmem_Size vmem_query_page_size() {
+VMEM_FUNC VMemSize vmem_query_page_size() {
     SYSTEM_INFO system_info = {};
     GetSystemInfo(&system_info);
     return system_info.dwPageSize;
 }
 
-VMEM_FUNC Vmem_Size vmem_query_allocation_granularity() {
+VMEM_FUNC VMemSize vmem_query_allocation_granularity() {
     SYSTEM_INFO system_info = {};
     GetSystemInfo(&system_info);
     return system_info.dwAllocationGranularity;
 }
 
-VMEM_FUNC Vmem_Result vmem_lock(void* ptr, const Vmem_Size num_bytes) {
+VMEM_FUNC VMemResult vmem_lock(void* ptr, const VMemSize num_bytes) {
     VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
     VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes cannot be null."));
 
     const BOOL result = VirtualLock(ptr, num_bytes);
     VMEM_ERROR_IF(result == 0, vmem__write_win32_error_message());
-    return Vmem_Result_Success;
+    return VMemResult_Success;
 }
 
-VMEM_FUNC Vmem_Result vmem_unlock(void* ptr, const Vmem_Size num_bytes) {
+VMEM_FUNC VMemResult vmem_unlock(void* ptr, const VMemSize num_bytes) {
     VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
     if(num_bytes == 0) return 0;
 
     const BOOL result = VirtualUnlock(ptr, num_bytes);
     VMEM_ERROR_IF(result == 0, vmem__write_win32_error_message());
-    return Vmem_Result_Success;
+    return VMemResult_Success;
 }
 
 #endif // defined(VMEM_PLATFORM_WIN32)
@@ -494,17 +494,17 @@ VMEM_FUNC Vmem_Result vmem_unlock(void* ptr, const Vmem_Size num_bytes) {
 // Linux implementation
 //
 #if defined(VMEM_PLATFORM_LINUX)
-static int vmem__linux_protect(const Vmem_Protect protect) {
+static int vmem__linux_protect(const VMemProtect protect) {
     switch(protect) {
-        case Vmem_Protect_NoAccess: return PROT_NONE;
-        case Vmem_Protect_Read: return PROT_READ;
-        case Vmem_Protect_ReadWrite: return PROT_READ | PROT_WRITE;
-        case Vmem_Protect_Execute: return PROT_EXEC;
-        case Vmem_Protect_ExecuteRead: return PROT_EXEC | PROT_READ;
-        case Vmem_Protect_ExecuteReadWrite: return PROT_EXEC | PROT_READ | PROT_WRITE;
+        case VMemProtect_NoAccess: return PROT_NONE;
+        case VMemProtect_Read: return PROT_READ;
+        case VMemProtect_ReadWrite: return PROT_READ | PROT_WRITE;
+        case VMemProtect_Execute: return PROT_EXEC;
+        case VMemProtect_ExecuteRead: return PROT_EXEC | PROT_READ;
+        case VMemProtect_ExecuteReadWrite: return PROT_EXEC | PROT_READ | PROT_WRITE;
     }
     vmem__write_error_message("Invalid protect mode.");
-    return Vmem_Result_Error;
+    return VMemResult_Error;
 }
 
 #if !defined(VMEM_NO_ERROR_MESSAGES)
@@ -522,7 +522,7 @@ static void vmem__write_linux_error_reason() {
 }
 #endif
 
-VMEM_FUNC void* vmem_alloc_protect(const Vmem_Size num_bytes, const Vmem_Protect protect) {
+VMEM_FUNC void* vmem_alloc_protect(const VMemSize num_bytes, const VMemProtect protect) {
     VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes cannot be null."));
 
     const int prot = vmem__linux_protect(protect);
@@ -533,10 +533,10 @@ VMEM_FUNC void* vmem_alloc_protect(const Vmem_Size num_bytes, const Vmem_Protect
         VMEM_ERROR_IF(result == MAP_FAILED, vmem__write_linux_error_reason());
         return result;
     }
-    return 0; // Vmem_Result_Error
+    return 0; // VMemResult_Error
 }
 
-VMEM_FUNC Vmem_Result vmem_dealloc(void* ptr, const Vmem_Size num_allocated_bytes) {
+VMEM_FUNC VMemResult vmem_dealloc(void* ptr, const VMemSize num_allocated_bytes) {
     VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
     VMEM_ERROR_IF(
         num_allocated_bytes == 0,
@@ -544,10 +544,10 @@ VMEM_FUNC Vmem_Result vmem_dealloc(void* ptr, const Vmem_Size num_allocated_byte
 
     const int result = munmap(ptr, num_allocated_bytes);
     VMEM_ERROR_IF(result != 0, vmem__write_linux_error_reason());
-    return Vmem_Result_Success;
+    return VMemResult_Success;
 }
 
-VMEM_FUNC Vmem_Result vmem_commit_protect(void* ptr, const Vmem_Size num_bytes, const Vmem_Protect protect) {
+VMEM_FUNC VMemResult vmem_commit_protect(void* ptr, const VMemSize num_bytes, const VMemProtect protect) {
     VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
     VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes cannot be null."));
 
@@ -555,51 +555,51 @@ VMEM_FUNC Vmem_Result vmem_commit_protect(void* ptr, const Vmem_Size num_bytes, 
     // need to commit anything.
     // But for compatibility with other platforms, we have to set the protection level.
     vmem_protect(ptr, num_bytes, protect);
-    return Vmem_Result_Success;
+    return VMemResult_Success;
 }
 
-VMEM_FUNC Vmem_Result vmem_decommit(void* ptr, const Vmem_Size num_bytes) {
+VMEM_FUNC VMemResult vmem_decommit(void* ptr, const VMemSize num_bytes) {
     VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
     VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes cannot be null."));
 
     const int result = madvise(ptr, num_bytes, MADV_DONTNEED);
     VMEM_ERROR_IF(result != 0, vmem__write_linux_error_reason());
-    return Vmem_Result_Success;
+    return VMemResult_Success;
 }
 
-VMEM_FUNC Vmem_Result vmem_protect(void* ptr, const Vmem_Size num_bytes, const Vmem_Protect protect) {
+VMEM_FUNC VMemResult vmem_protect(void* ptr, const VMemSize num_bytes, const VMemProtect protect) {
     VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
     VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes cannot be null."));
 
     const int result = mprotect(ptr, num_bytes, vmem__linux_protect(protect));
     VMEM_ERROR_IF(result != 0, vmem__write_linux_error_reason());
-    return Vmem_Result_Success;
+    return VMemResult_Success;
 }
 
-VMEM_FUNC Vmem_Size vmem_query_page_size() {
-    return (Vmem_Size)sysconf(_SC_PAGESIZE);
+VMEM_FUNC VMemSize vmem_query_page_size() {
+    return (VMemSize)sysconf(_SC_PAGESIZE);
 }
 
-VMEM_FUNC Vmem_Size vmem_query_allocation_granularity() {
-    return (Vmem_Size)sysconf(_SC_PAGESIZE);
+VMEM_FUNC VMemSize vmem_query_allocation_granularity() {
+    return (VMemSize)sysconf(_SC_PAGESIZE);
 }
 
-VMEM_FUNC Vmem_Result vmem_lock(void* ptr, const Vmem_Size num_bytes) {
+VMEM_FUNC VMemResult vmem_lock(void* ptr, const VMemSize num_bytes) {
     VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
     VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes cannot be null."));
 
     const int result = mlock(ptr, num_bytes);
     VMEM_ERROR_IF(result != 0, vmem__write_linux_error_reason());
-    return Vmem_Result_Success;
+    return VMemResult_Success;
 }
 
-VMEM_FUNC Vmem_Result vmem_unlock(void* ptr, const Vmem_Size num_bytes) {
+VMEM_FUNC VMemResult vmem_unlock(void* ptr, const VMemSize num_bytes) {
     VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
     VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes cannot be null."));
 
     const int result = munlock(ptr, num_bytes);
     VMEM_ERROR_IF(result != 0, vmem__write_linux_error_reason());
-    return Vmem_Result_Success;
+    return VMemResult_Success;
 }
 #endif // defined(VMEM_PLATFORM_LINUX)
 

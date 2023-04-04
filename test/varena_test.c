@@ -6,7 +6,7 @@
 UTEST(varena, common) {
     const int size = 1024 * 1024;
     VArena arena = varena_init(size);
-    ASSERT_TRUE(varena_is_valid(arena));
+    ASSERT_TRUE(varena_is_valid(&arena));
     ASSERT_EQ(arena._buf_len, size);
     ASSERT_TRUE(varena_alloc(&arena, 1024));
     ASSERT_EQ(arena.len, 1024);

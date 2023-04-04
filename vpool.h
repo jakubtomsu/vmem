@@ -64,7 +64,7 @@ struct VPoolContainer {
 };
 #endif // defined(__cplusplus) && !defined(VPOOL_NO_CPP_CONTAINER)
 
-#endif
+#endif // !defined(VPOOL_H_INCLUDED)
 
 #if defined(VPOOL_IMPLEMENTATION) && !defined(VPOOL_H_IMPLEMENTED)
 #define VPOOL_H_IMPLEMENTED
@@ -143,7 +143,7 @@ void vpool__set_commited_slots(VPool* pool, const size_t commited_slots) {
     pool->_commited_bytes = commited_bytes;
 }
 
-uint8_t* vpool_alloc(VPool* pool) {
+VPoolSlotIndex vpool_alloc_slot(VPool* pool) {
     // first, try to grab the top of the free list...
     VPoolSlotIndex index = pool->_first_unused_slot;
     if(index != VPOOL_SLOT_INDEX_INVALID) {
@@ -154,17 +154,31 @@ uint8_t* vpool_alloc(VPool* pool) {
         index = pool->_head_slot;
         pool->_head_slot++;
     }
-    return (uint8_t*)vpool__index_to_ptr(pool, index);
+    return index;
+}
+
+uint8_t* vpool_alloc(VPool* pool) {
+    const VPoolSlotIndex index = vpool_alloc_slot(pool);
+    return vpool__index_to_ptr(pool, index);
+}
+
+static inline void vpool__dealloc_slot_with_ptr(VPool* pool, const VPoolSlotIndex index, const void* ptr) {
+    // releasing -> push onto free list. The slot_ptr allocation will take the top of the free list,
+    // not push onto the pool.
+    *(VPoolSlotIndex*)ptr = pool->_first_unused_slot;
+    pool->_first_unused_slot = index;
+}
+
+void vpool_dealloc_slot(VPool* pool, VPoolSlotIndex index) {
+    vpool__dealloc_slot_with_ptr(pool, index, vpool__index_to_ptr(pool, index));
 }
 
 void vpool_dealloc(VPool* pool, void* slot_ptr) {
-    // releasing -> push onto free list. The slot_ptr allocation will take the top of the free list,
-    // not push onto the pool.
-    *(VPoolSlotIndex*)slot_ptr = pool->_first_unused_slot;
-    pool->_first_unused_slot = vpool__ptr_to_index(pool, slot_ptr);
+    vpool__dealloc_slot_with_ptr(pool, vpool__ptr_to_index(pool, slot_ptr), slot_ptr);
 }
 
 void vpool_clear_and_decommit(VPool* pool) {
+    vpool__set_commited_slots(pool, 0);
 }
 
 #endif // defined(VPOOL_IMPLEMENTATION) && !defined(VPOOL_H_IMPLEMENTED

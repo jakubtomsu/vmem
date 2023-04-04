@@ -184,6 +184,26 @@ VMEM_FUNC uintptr_t vmem_align_forward(const uintptr_t address, const int align)
 // @returns aligned address on success, Vmem_Result_Error on error.
 VMEM_FUNC uintptr_t vmem_align_backward(const uintptr_t address, const int align);
 
+// Check if an address is a multiple of `align`.
+VMEM_FUNC Vmem_Result vmem_is_aligned(const uintptr_t address, const int align);
+
+// Faster version of `vmem_align_forward`, because it doesn't do any error checking and can be inlined.
+static inline uintptr_t vmem_align_forward_fast(const uintptr_t address, const int align) {
+    const uintptr_t mask = (uintptr_t)(align - 1);
+    return (address + mask) & ~mask;
+}
+
+// Faster version of `vmem_align_backward`, because it doesn't do any error checking and can be inlined.
+static inline uintptr_t vmem_align_backward_fast(const uintptr_t address, const int align) {
+    return address & ~(align - 1);
+}
+
+// Faster version of `vmem_is_aligned`, because it doesn't do any error checking and can be inlined.
+// The alignment must be a power of 2.
+static inline Vmem_Result vmem_is_aligned_fast(const uintptr_t address, const int align) {
+    return (address & (address - 1)) == 0;
+}
+
 #if defined(__cplusplus)
 } // extern "C"
 #endif
@@ -317,15 +337,20 @@ VMEM_FUNC const char* vmem_get_error_message() {
 
 VMEM_FUNC uintptr_t vmem_align_forward(const uintptr_t address, const int align) {
     VMEM_ERROR_IF(align == 0, vmem__write_error_message("Alignment cannot be zero."));
-    const uintptr_t mask = (uintptr_t)(align - 1);
-    VMEM_ERROR_IF((align & mask) != 0, vmem__write_error_message("Alignment has to be a power of 2."));
-    return (address + mask) & ~mask;
+    VMEM_ERROR_IF((align & (align - 1)) != 0, vmem__write_error_message("Alignment has to be a power of 2."));
+    return vmem_align_forward_fast(address, align);
 }
 
 VMEM_FUNC uintptr_t vmem_align_backward(const uintptr_t address, const int align) {
     VMEM_ERROR_IF(align == 0, vmem__write_error_message("Alignment cannot be zero."));
     VMEM_ERROR_IF((align & (align - 1)) != 0, vmem__write_error_message("Alignment has to be a power of 2."));
-    return address & ~(align - 1);
+    return vmem_align_backward_fast(address, align);
+}
+
+VMEM_FUNC uintptr_t vmem_is_aligned(const uintptr_t address, const int align) {
+    VMEM_ERROR_IF(align == 0, vmem__write_error_message("Alignment cannot be zero."));
+    VMEM_ERROR_IF((align & (align - 1)) != 0, vmem__write_error_message("Alignment has to be a power of 2."));
+    return vmem_is_aligned_fast(address, align);
 }
 
 VMEM_FUNC const char* vmem_get_protect_name(const Vmem_Protect protect) {

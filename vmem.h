@@ -86,7 +86,7 @@ typedef enum VMemProtect_ {
 // This exists only to cache result of `vmem_query_page_size` so you can use faster `vmem_get_page_size`,
 // so this is completely optional. If you don't call this `vmem_get_page_size` will return 0.
 // There isn't any deinit/shutdown code.
-VMEM_FUNC void vmem_init();
+VMEM_FUNC void vmem_init(void);
 
 // Reserves (allocates but doesn't commit) a block of virtual address-space of size `num_bytes`.
 // @returns 0 on error, start address of the allocated memory block on success.
@@ -135,19 +135,19 @@ VMEM_FUNC VMemResult vmem_decommit(void* ptr, VMemSize num_bytes);
 VMEM_FUNC VMemResult vmem_protect(void* ptr, VMemSize num_bytes, VMemProtect protect);
 
 // @returns cached value from `vmem_query_page_size`
-VMEM_FUNC VMemSize vmem_get_page_size();
+VMEM_FUNC VMemSize vmem_get_page_size(void);
 
 // Query the page size from the system. Usually something like 4096 bytes.
 // @returns the page size in number bytes. Cannot fail.
-VMEM_FUNC VMemSize vmem_query_page_size();
+VMEM_FUNC VMemSize vmem_query_page_size(void);
 
 // @returns cached value from `vmem_query_allocation_granularity`
-VMEM_FUNC VMemSize vmem_get_allocation_granularity();
+VMEM_FUNC VMemSize vmem_get_allocation_granularity(void);
 
 // Query the allocation granularity (alignment of each allocation) from the system.
 // Usually 65KB on Windows and 4KB on linux (on linux it's page size).
 // @returns allocation granularity in bytes.
-VMEM_FUNC VMemSize vmem_query_allocation_granularity();
+VMEM_FUNC VMemSize vmem_query_allocation_granularity(void);
 
 // Locks the specified region of the process's virtual address space into physical memory, ensuring that subsequent
 // access to the region will not incur a page fault.
@@ -165,7 +165,7 @@ VMEM_FUNC VMemResult vmem_unlock(void* ptr, VMemSize num_bytes);
 //
 
 // This will return the last message after a function fails (VMemResult_Error).
-VMEM_FUNC const char* vmem_get_error_message();
+VMEM_FUNC const char* vmem_get_error_message(void);
 
 // Returns a static string for the protection mode.
 // e.g. VMemProtect_ReadWrite will return "ReadWrite".
@@ -298,17 +298,17 @@ extern "C" {
 static VMemSize vmem__g_page_size = 0;
 static VMemSize vmem__g_allocation_granularity = 0;
 
-VMEM_FUNC void vmem_init() {
+VMEM_FUNC void vmem_init(void) {
     // Note: this will be 2 syscalls on windows.
     vmem__g_page_size = vmem_query_page_size();
     vmem__g_allocation_granularity = vmem_query_allocation_granularity();
 }
 
-VMEM_FUNC VMemSize vmem_get_page_size() {
+VMEM_FUNC VMemSize vmem_get_page_size(void) {
     return vmem__g_page_size;
 }
 
-VMEM_FUNC VMemSize vmem_get_allocation_granularity() {
+VMEM_FUNC VMemSize vmem_get_allocation_granularity(void) {
     return vmem__g_allocation_granularity;
 }
 
@@ -324,13 +324,13 @@ static void vmem__write_error_message(const char* str) {
     vmem__g_error_message[i] = 0;
 }
 
-VMEM_FUNC const char* vmem_get_error_message() {
+VMEM_FUNC const char* vmem_get_error_message(void) {
     return &vmem__g_error_message[0];
 }
 #else
 #define vmem__write_error_message(message) // Ignore
 
-VMEM_FUNC const char* vmem_get_error_message() {
+VMEM_FUNC const char* vmem_get_error_message(void) {
     return "<Error messages disabled>";
 }
 #endif                                     // !defined(VMEM_NO_ERROR_MESSAGES)
@@ -384,7 +384,7 @@ static DWORD vmem__win32_protect(const VMemProtect protect) {
 }
 
 #if !defined(VMEM_NO_ERROR_MESSAGES)
-static void vmem__write_win32_error_message() {
+static void vmem__write_win32_error_message(void) {
     const DWORD result = FormatMessageA(
         FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
         NULL,
@@ -456,13 +456,13 @@ VMEM_FUNC VMemResult vmem_protect(void* ptr, const VMemSize num_bytes, const VMe
     return VMemResult_Success;
 }
 
-VMEM_FUNC VMemSize vmem_query_page_size() {
+VMEM_FUNC VMemSize vmem_query_page_size(void) {
     SYSTEM_INFO system_info = {};
     GetSystemInfo(&system_info);
     return system_info.dwPageSize;
 }
 
-VMEM_FUNC VMemSize vmem_query_allocation_granularity() {
+VMEM_FUNC VMemSize vmem_query_allocation_granularity(void) {
     SYSTEM_INFO system_info = {};
     GetSystemInfo(&system_info);
     return system_info.dwAllocationGranularity;
@@ -508,7 +508,7 @@ static int vmem__linux_protect(const VMemProtect protect) {
 }
 
 #if !defined(VMEM_NO_ERROR_MESSAGES)
-static void vmem__write_linux_error_reason() {
+static void vmem__write_linux_error_reason(void) {
     // https://linux.die.net/man/3/strerror_r
 #ifdef STRERROR_R_CHAR_P
     // GNU variant can return a pointer outside the passed buffer
@@ -576,11 +576,11 @@ VMEM_FUNC VMemResult vmem_protect(void* ptr, const VMemSize num_bytes, const VMe
     return VMemResult_Success;
 }
 
-VMEM_FUNC VMemSize vmem_query_page_size() {
+VMEM_FUNC VMemSize vmem_query_page_size(void) {
     return (VMemSize)sysconf(_SC_PAGESIZE);
 }
 
-VMEM_FUNC VMemSize vmem_query_allocation_granularity() {
+VMEM_FUNC VMemSize vmem_query_allocation_granularity(void) {
     return (VMemSize)sysconf(_SC_PAGESIZE);
 }
 

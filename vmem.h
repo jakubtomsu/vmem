@@ -35,7 +35,7 @@
 #define VMEM_H_INCLUDED
 
 #include <stdint.h>
-#include <stddef.h> // size_t
+#include <stddef.h> // VMemSize
 
 #if !defined(VMEM_FUNC)
 #define VMEM_FUNC
@@ -92,23 +92,6 @@ VMEM_FUNC void vmem_init(void);
 // @returns 0 on error, start address of the allocated memory block on success.
 VMEM_FUNC void* vmem_alloc_protect(VMemSize num_bytes, VMemProtect protect);
 
-// Reserves (allocates but doesn't commit) a block of virtual address-space of size `num_bytes`, in ReadWrite protection
-// mode. The memory is zeroed. Dealloc with `vmem_dealloc`. Note: you must commit the memory before using it.
-// To maximize efficiency, try to always use a multiple of allocation granularity (see
-// `vmem_get_allocation_granularity`) for size of allocations.
-// @param num_bytes: total size of the memory block.
-// @returns 0 on error, start address of the allocated memory block on success.
-static VMEM_INLINE void* vmem_alloc(const VMemSize num_bytes) {
-    return vmem_alloc_protect(num_bytes, VMemProtect_ReadWrite);
-}
-
-// Allocates memory and commits all of it.
-static VMEM_INLINE void* vmem_alloccommited(const VmemSize num_bytes) {
-    void* ptr = vmem_alloc(num_bytes);
-    vmem_commit(ptr, num_bytes, VMemProtect_ReadWrite);
-    return ptr;
-}
-
 // Deallocs (releases) a block of virtual memory.
 // @param alloc_ptr: a pointer to the start of the memory block. Result of `vmem_alloc`.
 // @param num_allocated_bytes: *must* be the value returned by `vmem_alloc`.
@@ -122,15 +105,6 @@ VMEM_FUNC VMemResult vmem_dealloc(void* alloc_ptr, VMemSize num_allocated_bytes)
 // @param num_bytes: number of bytes to commit.
 // @param protect: protection mode for the newly commited pages.
 VMEM_FUNC VMemResult vmem_commit_protect(void* ptr, VMemSize num_bytes, VMemProtect protect);
-
-// Commit memory pages which contain one or more bytes in [ptr...ptr+num_bytes]. The pages will be mapped to physical
-// memory. The page protection mode will be changed to ReadWrite. Use `vmem_commit_protect` to specify a different mode.
-// Decommit with `vmem_decommit`.
-// @param ptr: pointer to the pointer returned by `vmem_alloc` or shifted by [0...num_bytes].
-// @param num_bytes: number of bytes to commit.
-static VMEM_INLINE VMemResult vmem_commit(void* ptr, const VMemSize num_bytes) {
-    return vmem_commit_protect(ptr, num_bytes, VMemProtect_ReadWrite);
-}
 
 // Decommits the memory pages which contain one or more bytes in [ptr...ptr+num_bytes]. The pages will be unmapped from
 // physical memory.
@@ -170,6 +144,33 @@ VMEM_FUNC VMemResult vmem_unlock(void* ptr, VMemSize num_bytes);
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Utilities
 //
+
+
+// Reserves (allocates but doesn't commit) a block of virtual address-space of size `num_bytes`, in ReadWrite protection
+// mode. The memory is zeroed. Dealloc with `vmem_dealloc`. Note: you must commit the memory before using it.
+// To maximize efficiency, try to always use a multiple of allocation granularity (see
+// `vmem_get_allocation_granularity`) for size of allocations.
+// @param num_bytes: total size of the memory block.
+// @returns 0 on error, start address of the allocated memory block on success.
+static VMEM_INLINE void* vmem_alloc(const VMemSize num_bytes) {
+    return vmem_alloc_protect(num_bytes, VMemProtect_ReadWrite);
+}
+
+// Allocates memory and commits all of it.
+static VMEM_INLINE void* vmem_alloc_commited(const VMemSize num_bytes) {
+    void* ptr = vmem_alloc(num_bytes);
+    vmem_commit_protect(ptr, num_bytes, VMemProtect_ReadWrite);
+    return ptr;
+}
+
+// Commit memory pages which contain one or more bytes in [ptr...ptr+num_bytes]. The pages will be mapped to physical
+// memory. The page protection mode will be changed to ReadWrite. Use `vmem_commit_protect` to specify a different mode.
+// Decommit with `vmem_decommit`.
+// @param ptr: pointer to the pointer returned by `vmem_alloc` or shifted by [0...num_bytes].
+// @param num_bytes: number of bytes to commit.
+static VMEM_INLINE VMemResult vmem_commit(void* ptr, const VMemSize num_bytes) {
+    return vmem_commit_protect(ptr, num_bytes, VMemProtect_ReadWrite);
+}
 
 // This will return the last message after a function fails (VMemResult_Error).
 VMEM_FUNC const char* vmem_get_error_message(void);
@@ -219,18 +220,9 @@ static inline VMemResult vmem_is_aligned_fast(const uintptr_t address, const int
 // Very useful for implementing memory allocators and containers.
 typedef struct VMemArena {
     uint8_t* mem;
-    VMemSize size;
+    VMemSize size_bytes;
     VMemSize commited;
 } VMemArena;
-
-// Initialize the arena with an existing memory block, which you manage on your own.
-// Note: when using this, use `vmem_dealloc` on your own, don't call `vmem_arena_dealloc`!
-static VMEM_INLINE VMemArena vmem_arena_init(void* mem, VMemSize size_bytes) {
-    VMemArena arena = {0};
-    arena.mem = mem;
-    arena.size = size_bytes;
-    return arena;
-}
 
 // Initialize an arena and allocate memory of size `size_bytes`.
 // Use `vmem_arena_dealloc` to free the memory.
@@ -244,11 +236,25 @@ VMEM_FUNC VMemResult vmem_arena_dealloc(VMemArena* arena);
 // If `commited > arena.commited`, this will expand the usable range.
 VMEM_FUNC VMemResult vmem_arena_set_commited(VMemArena* arena, VMemSize commited);
 
+// Initialize the arena with an existing memory block, which you manage on your own.
+// Note: when using this, use `vmem_dealloc` on your own, don't call `vmem_arena_dealloc`!
+// @param mem: pointer returned by `vmem_alloc`.
+static VMEM_INLINE VMemArena vmem_arena_init(void* mem, VMemSize size_bytes) {
+    VMemArena arena = {0};
+    arena.mem = (uint8_t*)mem;
+    arena.size_bytes = size_bytes;
+    return arena;
+}
+
 static VMEM_INLINE VMemResult vmem_arena_is_valid(const VMemArena* arena) {
     if(arena) {
-        return arena->mem != 0 && arena->size > 0;
+        return arena->mem != 0 && arena->size_bytes > 0;
     }
-    return VMemResult_Failure;
+    return VMemResult_Error;
+}
+
+static inline VMemSize vmem_arena_calc_bytes_used_for_size(const VMemSize size_bytes) {
+    return vmem_align_forward(size_bytes, vmem_get_page_size());
 }
 
 #if defined(__cplusplus)
@@ -662,42 +668,46 @@ VMEM_FUNC VMemArena vmem_arena_alloc(VMemSize size_bytes) {
         return {0};
     }
     VMemArena arena = {0};
-    arena.mem = vmem_alloc(size_bytes);
+    arena.mem = (uint8_t*)vmem_alloc(size_bytes);
+    arena.size_bytes = size_bytes;
     return arena;
 }
 
 VMEM_FUNC VMemResult vmem_arena_dealloc(VMemArena* arena) {
-    VMEM_FAIL_IF(arena == 0, vmem__write_error_message("Arena pointer is null."));
-    return vmem_dealloc(arena->mem,  arena->size);
+    VMEM_ERROR_IF(arena == 0, vmem__write_error_message("Arena pointer is null."));
+    const VMemResult result = vmem_dealloc(arena->mem, arena->size_bytes);
+    arena->mem = 0;
+    return result;
 }
 
-VMEM_FUNC VMemResult vmem_arena_set_commited(VMemArena* arena, VMemSize num_commited_bytes) {
-    if(commited == arena->commited) return;
+VMEM_FUNC VMemResult vmem_arena_set_commited(VMemArena* arena, const VMemSize commited) {
+    if(commited == arena->commited) return VMemResult_Success;
 
-    const size_t new_commited_bytes = varena_calc_bytes_used_for_size(commited);
-    const size_t current_commited_bytes = varena_calc_bytes_used_for_size(arena->commited);
+    const VMemSize new_commited_bytes = vmem_arena_calc_bytes_used_for_size(commited);
+    const VMemSize current_commited_bytes = vmem_arena_calc_bytes_used_for_size(arena->commited);
 
     // Shrink
     if(commited < arena->commited) {
         if(new_commited_bytes < current_commited_bytes) {
-            const size_t bytes_to_dealloc =
-                (size_t)((intptr_t)current_commited_bytes - (intptr_t)new_commited_bytes);
-            vmem_decommit(arena->_buf + new_commited_bytes, bytes_to_dealloc);
+            const VMemSize bytes_to_dealloc =
+                (VMemSize)((intptr_t)current_commited_bytes - (intptr_t)new_commited_bytes);
+            vmem_decommit(arena->mem + new_commited_bytes, bytes_to_dealloc);
         }
     }
     // Expand
     else {
         // If you hit this, you likely either didn't alloc enough space up-front,
         // or have a leak that is allocating too many elements
-        VMEM_FAIL_IF(commited >= arena->size,
-            vmem__write_error_message("You've used up all the memory available."));
+        VMEM_ERROR_IF(
+            commited > arena->size_bytes, vmem__write_error_message("You've used up all the memory available."));
 
         if(current_commited_bytes < new_commited_bytes) {
-            vmem_commit(arena->_buf, new_commited_bytes);
+            vmem_commit(arena->mem, new_commited_bytes);
         }
     }
 
     arena->commited = commited;
+    return VMemResult_Success;
 }
 
 #if defined(__cplusplus)

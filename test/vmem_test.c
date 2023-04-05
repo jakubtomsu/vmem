@@ -159,10 +159,23 @@ UTEST(vmem, overlapped_page) {
     ASSERT_TRUE(vmem_dealloc(ptr, size));
 }
 
+UTEST(vmem, arena_common) {
+    VMemArena arena = {};
+    ASSERT_FALSE(vmem_arena_is_valid(&arena));
+    arena = vmem_arena_alloc(1024 * 1024);
+    ASSERT_TRUE(vmem_arena_is_valid(&arena));
+    ASSERT_TRUE(vmem_arena_set_commited(&arena, 1024 * 128));
+    ASSERT_TRUE(vmem_arena_set_commited(&arena, 1024 * 64));
+    ASSERT_TRUE(vmem_arena_set_commited(&arena, 0));
+    ASSERT_TRUE(vmem_arena_set_commited(&arena, arena.size_bytes));
+    ASSERT_TRUE(vmem_arena_dealloc(&arena));
+    ASSERT_FALSE(vmem_arena_is_valid(&arena));
+}
+
 /*
 #include <stdint.h>
 #include <stdio.h>
-#include <assert.h>
+#include <assert.h
 
 #define SIZE (1024 * 512) // 0.5MB
 

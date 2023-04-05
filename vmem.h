@@ -103,10 +103,10 @@ static VMEM_INLINE void* vmem_alloc(const VMemSize num_bytes) {
 }
 
 // Allocates memory and commits all of it.
-static VMEM_INLINE void* vmem_alloc_commited(const VmemSize num_bytes) {
-	void* ptr = vmem_alloc(num_bytes);
-	vmem_commit(ptr, num_bytes, VMemProtect_ReadWrite);
-	return ptr;
+static VMEM_INLINE void* vmem_alloccommited(const VmemSize num_bytes) {
+    void* ptr = vmem_alloc(num_bytes);
+    vmem_commit(ptr, num_bytes, VMemProtect_ReadWrite);
+    return ptr;
 }
 
 // Deallocs (releases) a block of virtual memory.
@@ -215,29 +215,40 @@ static inline VMemResult vmem_is_aligned_fast(const uintptr_t address, const int
 // Arena
 //
 
-// Arena of virtual memory.
+// Arena of virtual memory. Works like a resizable array, but doesn't need to be reallocated and copied.
+// Very useful for implementing memory allocators and containers.
 typedef struct VMemArena {
-	uint8_t* mem;
-	VMemSize size;
-	VMemSize commited;
+    uint8_t* mem;
+    VMemSize size;
+    VMemSize commited;
 } VMemArena;
 
+// Initialize the arena with an existing memory block, which you manage on your own.
+// Note: when using this, use `vmem_dealloc` on your own, don't call `vmem_arena_dealloc`!
 static VMEM_INLINE VMemArena vmem_arena_init(void* mem, VMemSize size_bytes) {
-	VMemArena arena = {0};
-	arena.mem = mem;
-	arena.size = size_bytes;
-	return arena;
+    VMemArena arena = {0};
+    arena.mem = mem;
+    arena.size = size_bytes;
+    return arena;
 }
 
+// Initialize an arena and allocate memory of size `size_bytes`.
+// Use `vmem_arena_dealloc` to free the memory.
 VMEM_FUNC VMemArena vmem_arena_alloc(VMemSize size_bytes);
+
+// De-initialize an arena initialized with `vmem_arena_alloc`.
 VMEM_FUNC VMemResult vmem_arena_dealloc(VMemArena* arena);
+
+// Commit a specific number of bytes from the arena.
+// If `commited < arena.commited`, this will shrink the usable range.
+// If `commited > arena.commited`, this will expand the usable range.
 VMEM_FUNC VMemResult vmem_arena_set_commited(VMemArena* arena, VMemSize commited);
 
 static VMEM_INLINE VMemResult vmem_arena_is_valid(const VMemArena* arena) {
-	if(arena) {
-		return arena->mem != 0 && arena->size > 0;
-	}
-	return VMemResult_Failure;
+    if(arena) {
+        return arena->mem != 0 && arena->size > 0;
+    }
+    return VMemResult_Failure;
 }
 
 #if defined(__cplusplus)
@@ -646,22 +657,47 @@ VMEM_FUNC VMemResult vmem_unlock(void* ptr, const VMemSize num_bytes) {
 //
 
 VMEM_FUNC VMemArena vmem_arena_alloc(VMemSize size_bytes) {
-	if(size_bytes == 0) {
-		vmem__write_error_message("Arena size cannot be zero.");
-		return {0};
-	}
-	VMemArena arena = {0};
-	arena.mem = vmem_alloc(size_bytes);
-	return arena;
+    if(size_bytes == 0) {
+        vmem__write_error_message("Arena size cannot be zero.");
+        return {0};
+    }
+    VMemArena arena = {0};
+    arena.mem = vmem_alloc(size_bytes);
+    return arena;
 }
 
 VMEM_FUNC VMemResult vmem_arena_dealloc(VMemArena* arena) {
-	VMEM_FAIL_IF(arena == 0, vmem__write_error_message("Arena pointer is null."));
-	return vmem_dealloc(arena->mem,  arena->size);
+    VMEM_FAIL_IF(arena == 0, vmem__write_error_message("Arena pointer is null."));
+    return vmem_dealloc(arena->mem,  arena->size);
 }
 
 VMEM_FUNC VMemResult vmem_arena_set_commited(VMemArena* arena, VMemSize num_commited_bytes) {
-	
+    if(commited == arena->commited) return;
+
+    const size_t new_commited_bytes = varena_calc_bytes_used_for_size(commited);
+    const size_t current_commited_bytes = varena_calc_bytes_used_for_size(arena->commited);
+
+    // Shrink
+    if(commited < arena->commited) {
+        if(new_commited_bytes < current_commited_bytes) {
+            const size_t bytes_to_dealloc =
+                (size_t)((intptr_t)current_commited_bytes - (intptr_t)new_commited_bytes);
+            vmem_decommit(arena->_buf + new_commited_bytes, bytes_to_dealloc);
+        }
+    }
+    // Expand
+    else {
+        // If you hit this, you likely either didn't alloc enough space up-front,
+        // or have a leak that is allocating too many elements
+        VMEM_FAIL_IF(commited >= arena->size,
+            vmem__write_error_message("You've used up all the memory available."));
+
+        if(current_commited_bytes < new_commited_bytes) {
+            vmem_commit(arena->_buf, new_commited_bytes);
+        }
+    }
+
+    arena->commited = commited;
 }
 
 #if defined(__cplusplus)

@@ -78,6 +78,11 @@ typedef enum VMemProtect_ {
     VMemProtect_COUNT,
 } VMemProtect_;
 
+typedef struct VMemUsageStatus {
+    VMemSize total_physical_pages;
+    VMemSize avail_physical_pages;
+} VMemUsageStatus;
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Public API
 //
@@ -130,6 +135,8 @@ VMEM_FUNC VMemSize vmem_get_allocation_granularity(void);
 // @returns allocation granularity in bytes.
 VMEM_FUNC VMemSize vmem_query_allocation_granularity(void);
 
+VMEM_FUNC VMemUsageStatus vmem_query_usage_status(void);
+
 // Locks the specified region of the process's virtual address space into physical memory, ensuring that subsequent
 // access to the region will not incur a page fault.
 // All pages in the specified region must be commited.
@@ -140,11 +147,6 @@ VMEM_FUNC VMemResult vmem_lock(void* ptr, VMemSize num_bytes);
 // out to the paging file if necessary.
 // If you try to unlock pages which aren't locked, this will fail.
 VMEM_FUNC VMemResult vmem_unlock(void* ptr, VMemSize num_bytes);
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Utilities
-//
-
 
 // Reserves (allocates but doesn't commit) a block of virtual address-space of size `num_bytes`, in ReadWrite protection
 // mode. The memory is zeroed. Dealloc with `vmem_dealloc`. Note: you must commit the memory before using it.
@@ -521,6 +523,17 @@ VMEM_FUNC VMemSize vmem_query_allocation_granularity(void) {
     return system_info.dwAllocationGranularity;
 }
 
+VMEM_FUNC VMemUsageStatus vmem_query_usage_status(void) {
+    MEMORYSTATUS status = {0};
+    GlobalMemoryStatus(&status);
+
+    VMemUsageStatus usage_status = {0};
+    usage_status.total_physical_pages = status.dwTotalPhys;
+    usage_status.avail_physical_pages = status.dwAvailPhys;
+
+    return usage_status;
+}
+
 VMEM_FUNC VMemResult vmem_lock(void* ptr, const VMemSize num_bytes) {
     VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
     VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes cannot be null."));
@@ -635,6 +648,13 @@ VMEM_FUNC VMemSize vmem_query_page_size(void) {
 
 VMEM_FUNC VMemSize vmem_query_allocation_granularity(void) {
     return (VMemSize)sysconf(_SC_PAGESIZE);
+}
+
+VMEM_FUNC VMemUsageStatus vmem_query_usage_status(void) {
+    VMemUsageStatus usage_status = {0};
+    usage_status.total_physical_pages = (VMemSize)sysconf(_SC_PHYS_PAGES);
+    usage_status.avail_physical_pages = (VMemSize)sysconf(_SC_AVPHYS_PAGES);
+    return usage_status;
 }
 
 VMEM_FUNC VMemResult vmem_lock(void* ptr, const VMemSize num_bytes) {

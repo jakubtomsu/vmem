@@ -102,6 +102,13 @@ static VMEM_INLINE void* vmem_alloc(const VMemSize num_bytes) {
     return vmem_alloc_protect(num_bytes, VMemProtect_ReadWrite);
 }
 
+// Allocates memory and commits all of it.
+static VMEM_INLINE void* vmem_alloc_commited(const VmemSize num_bytes) {
+	void* ptr = vmem_alloc(num_bytes);
+	vmem_commit(ptr, num_bytes, VMemProtect_ReadWrite);
+	return ptr;
+}
+
 // Deallocs (releases) a block of virtual memory.
 // @param alloc_ptr: a pointer to the start of the memory block. Result of `vmem_alloc`.
 // @param num_allocated_bytes: *must* be the value returned by `vmem_alloc`.
@@ -202,6 +209,35 @@ static inline uintptr_t vmem_align_backward_fast(const uintptr_t address, const 
 // The alignment must be a power of 2.
 static inline VMemResult vmem_is_aligned_fast(const uintptr_t address, const int align) {
     return (address & (address - 1)) == 0;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Arena
+//
+
+// Arena of virtual memory.
+typedef struct VMemArena {
+	uint8_t* mem;
+	VMemSize size;
+	VMemSize commited;
+} VMemArena;
+
+static VMEM_INLINE VMemArena vmem_arena_init(void* mem, VMemSize size_bytes) {
+	VMemArena arena = {0};
+	arena.mem = mem;
+	arena.size = size_bytes;
+	return arena;
+}
+
+VMEM_FUNC VMemArena vmem_arena_alloc(VMemSize size_bytes);
+VMEM_FUNC VMemResult vmem_arena_dealloc(VMemArena* arena);
+VMEM_FUNC VMemResult vmem_arena_set_commited(VMemArena* arena, VMemSize commited);
+
+static VMEM_INLINE VMemResult vmem_arena_is_valid(const VMemArena* arena) {
+	if(arena) {
+		return arena->mem != 0 && arena->size > 0;
+	}
+	return VMemResult_Failure;
 }
 
 #if defined(__cplusplus)
@@ -367,7 +403,7 @@ VMEM_FUNC const char* vmem_get_protect_name(const VMemProtect protect) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Windows implementation
+// Windows backend implementation
 //
 #if defined(VMEM_PLATFORM_WIN32)
 static DWORD vmem__win32_protect(const VMemProtect protect) {
@@ -491,7 +527,7 @@ VMEM_FUNC VMemResult vmem_unlock(void* ptr, const VMemSize num_bytes) {
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Linux implementation
+// Linux backend implementation
 //
 #if defined(VMEM_PLATFORM_LINUX)
 static int vmem__linux_protect(const VMemProtect protect) {
@@ -508,7 +544,7 @@ static int vmem__linux_protect(const VMemProtect protect) {
 }
 
 #if !defined(VMEM_NO_ERROR_MESSAGES)
-static void vmem__write_linux_error_reason(void) {
+static void vmem__write_linux_error_message(void) {
     // https://linux.die.net/man/3/strerror_r
 #ifdef STRERROR_R_CHAR_P
     // GNU variant can return a pointer outside the passed buffer
@@ -530,7 +566,7 @@ VMEM_FUNC void* vmem_alloc_protect(const VMemSize num_bytes, const VMemProtect p
         const int flags = MAP_PRIVATE | MAP_ANONYMOUS;
         // Note: memory is always initialized to zero when using MAP_ANONYMOUS.
         void* result = mmap(0, num_bytes, prot, flags, -1, 0);
-        VMEM_ERROR_IF(result == MAP_FAILED, vmem__write_linux_error_reason());
+        VMEM_ERROR_IF(result == MAP_FAILED, vmem__write_linux_error_message());
         return result;
     }
     return 0; // VMemResult_Error
@@ -543,7 +579,7 @@ VMEM_FUNC VMemResult vmem_dealloc(void* ptr, const VMemSize num_allocated_bytes)
         vmem__write_error_message("Cannot dealloc a memory block of size 0 (num_allocated_bytes is 0)."));
 
     const int result = munmap(ptr, num_allocated_bytes);
-    VMEM_ERROR_IF(result != 0, vmem__write_linux_error_reason());
+    VMEM_ERROR_IF(result != 0, vmem__write_linux_error_message());
     return VMemResult_Success;
 }
 
@@ -563,7 +599,7 @@ VMEM_FUNC VMemResult vmem_decommit(void* ptr, const VMemSize num_bytes) {
     VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes cannot be null."));
 
     const int result = madvise(ptr, num_bytes, MADV_DONTNEED);
-    VMEM_ERROR_IF(result != 0, vmem__write_linux_error_reason());
+    VMEM_ERROR_IF(result != 0, vmem__write_linux_error_message());
     return VMemResult_Success;
 }
 
@@ -572,7 +608,7 @@ VMEM_FUNC VMemResult vmem_protect(void* ptr, const VMemSize num_bytes, const VMe
     VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes cannot be null."));
 
     const int result = mprotect(ptr, num_bytes, vmem__linux_protect(protect));
-    VMEM_ERROR_IF(result != 0, vmem__write_linux_error_reason());
+    VMEM_ERROR_IF(result != 0, vmem__write_linux_error_message());
     return VMemResult_Success;
 }
 
@@ -589,7 +625,7 @@ VMEM_FUNC VMemResult vmem_lock(void* ptr, const VMemSize num_bytes) {
     VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes cannot be null."));
 
     const int result = mlock(ptr, num_bytes);
-    VMEM_ERROR_IF(result != 0, vmem__write_linux_error_reason());
+    VMEM_ERROR_IF(result != 0, vmem__write_linux_error_message());
     return VMemResult_Success;
 }
 
@@ -598,10 +634,35 @@ VMEM_FUNC VMemResult vmem_unlock(void* ptr, const VMemSize num_bytes) {
     VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes cannot be null."));
 
     const int result = munlock(ptr, num_bytes);
-    VMEM_ERROR_IF(result != 0, vmem__write_linux_error_reason());
+    VMEM_ERROR_IF(result != 0, vmem__write_linux_error_message());
     return VMemResult_Success;
 }
 #endif // defined(VMEM_PLATFORM_LINUX)
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Arena implementation
+//
+
+VMEM_FUNC VMemArena vmem_arena_alloc(VMemSize size_bytes) {
+	if(size_bytes == 0) {
+		vmem__write_error_message("Arena size cannot be zero.");
+		return {0};
+	}
+	VMemArena arena = {0};
+	arena.mem = vmem_alloc(size_bytes);
+	return arena;
+}
+
+VMEM_FUNC VMemResult vmem_arena_dealloc(VMemArena* arena) {
+	VMEM_FAIL_IF(arena == 0, vmem__write_error_message("Arena pointer is null."));
+	return vmem_dealloc(arena->mem,  arena->size);
+}
+
+VMEM_FUNC VMemResult vmem_arena_set_commited(VMemArena* arena, VMemSize num_commited_bytes) {
+	
+}
 
 #if defined(__cplusplus)
 }

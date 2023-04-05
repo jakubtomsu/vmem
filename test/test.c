@@ -6,8 +6,6 @@
 
 // Tests
 #include "vmem_test.c"
-#include "varena_test.c"
-#include "vpool_test.c"
 
 UTEST_STATE();
 

@@ -215,6 +215,12 @@ static inline VMemResult vmem_is_aligned_fast(const uintptr_t address, const int
     return (address & (align - 1)) == 0;
 }
 
+// Commit a specific number of bytes from the region.
+// If `commited < prev_commited`, this will shrink the usable range.
+// If `commited > prev_commited`, this will expand the usable range.
+VMEM_FUNC VMemResult
+vmem_partially_commit_region(void* ptr, VMemSize num_bytes, VMemSize prev_commited, VMemSize commited);
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Arena
 //
@@ -222,33 +228,31 @@ static inline VMemResult vmem_is_aligned_fast(const uintptr_t address, const int
 // Arena of virtual memory. Works like a resizable array, but doesn't need to be reallocated and copied.
 // Very useful for implementing memory allocators and containers.
 typedef struct VMemArena {
+    // Base address of the memory arena. Aligned to page size. Points to memory allocated with `vmem_alloc`.
     uint8_t* mem;
+    // Total size/capacity of the arena.
     VMemSize size_bytes;
+    // Number of bytes from range [mem...mem+size_bytes] which are commited and usable.
     VMemSize commited;
 } VMemArena;
 
-// Initialize an arena and allocate memory of size `size_bytes`.
-// Use `vmem_arena_dealloc` to free the memory.
-VMEM_FUNC VMemArena vmem_arena_alloc(VMemSize size_bytes);
+// Initialize the arena with an existing memory block, which you manage on your own.
+// Note: when using this, use `vmem_dealloc` on your own, don't call `vmem_arena_deinit_dealloc`!
+// @param mem: pointer returned by `vmem_alloc`, or shifted by N bytes (you can sub-allocate one memory allocation).
+VMEM_FUNC VMemArena vmem_arena_init(void* mem, VMemSize size_bytes);
 
-// De-initialize an arena initialized with `vmem_arena_alloc`.
-VMEM_FUNC VMemResult vmem_arena_dealloc(VMemArena* arena);
+// Initialize an arena and allocate memory of size `size_bytes`.
+// Use `vmem_arena_deinit_dealloc` to free the memory.
+VMEM_FUNC VMemArena vmem_arena_init_alloc(VMemSize size_bytes);
+
+// De-initialize an arena initialized with `vmem_arena_init_alloc`.
+// Frees the arena memory using `vmem_dealloc`.
+VMEM_FUNC VMemResult vmem_arena_deinit_dealloc(VMemArena* arena);
 
 // Commit a specific number of bytes from the arena.
 // If `commited < arena.commited`, this will shrink the usable range.
 // If `commited > arena.commited`, this will expand the usable range.
 VMEM_FUNC VMemResult vmem_arena_set_commited(VMemArena* arena, VMemSize commited);
-
-// Initialize the arena with an existing memory block, which you manage on your own.
-// Note: when using this, use `vmem_dealloc` on your own, don't call `vmem_arena_dealloc`!
-// @param mem: pointer returned by `vmem_alloc`, or shifted by N bytes (you can sub-allocate one memory allocation).
-// @param size_bytes: size of the arena in bytes.
-static VMEM_INLINE VMemArena vmem_arena_init(void* mem, VMemSize size_bytes) {
-    VMemArena arena = {0};
-    arena.mem = (uint8_t*)mem;
-    arena.size_bytes = size_bytes;
-    return arena;
-}
 
 // @returns true if the arena is valid (it was initialized with valid memory and size).
 static VMEM_INLINE VMemResult vmem_arena_is_valid(const VMemArena* arena) {
@@ -427,8 +431,8 @@ VMEM_FUNC uintptr_t vmem_align_backward(const uintptr_t address, const int align
 }
 
 VMEM_FUNC VMemResult vmem_is_aligned(const uintptr_t address, const int align) {
-    VMEM_ERROR_IF(align == 0, vmem__write_error_message("Alignment cannot be zero."));
-    VMEM_ERROR_IF((align & (align - 1)) != 0, vmem__write_error_message("Alignment has to be a power of 2."));
+    if(align == 0) return 0;
+    if((align & (align - 1)) != 0) return 0;
     return vmem_is_aligned_fast(address, align);
 }
 
@@ -522,7 +526,7 @@ VMEM_FUNC VMemResult vmem_dealloc(void* ptr, const VMemSize num_allocated_bytes)
 
 VMEM_FUNC VMemResult vmem_commit_protect(void* ptr, const VMemSize num_bytes, const VMemProtect protect) {
     VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
-    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes) cannot be 0."));
+    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size cannot be 0."));
 
     const LPVOID result = VirtualAlloc(ptr, num_bytes, MEM_COMMIT, vmem__win32_protect(protect));
     VMEM_ERROR_IF(result == 0, vmem__write_win32_error_message());
@@ -531,7 +535,7 @@ VMEM_FUNC VMemResult vmem_commit_protect(void* ptr, const VMemSize num_bytes, co
 
 VMEM_FUNC VMemResult vmem_decommit(void* ptr, const VMemSize num_bytes) {
     VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
-    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes) cannot be 0."));
+    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size cannot be 0."));
 
     const BOOL result = VirtualFree(ptr, num_bytes, MEM_DECOMMIT);
     VMEM_ERROR_IF(result == 0, vmem__write_win32_error_message());
@@ -540,7 +544,7 @@ VMEM_FUNC VMemResult vmem_decommit(void* ptr, const VMemSize num_bytes) {
 
 VMEM_FUNC VMemResult vmem_protect(void* ptr, const VMemSize num_bytes, const VMemProtect protect) {
     VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
-    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes) cannot be 0."));
+    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size cannot be 0."));
 
     DWORD old_protect = 0;
     const BOOL result = VirtualProtect(ptr, num_bytes, vmem__win32_protect(protect), &old_protect);
@@ -573,7 +577,7 @@ VMEM_FUNC VMemUsageStatus vmem_query_usage_status(void) {
 
 VMEM_FUNC VMemResult vmem_lock(void* ptr, const VMemSize num_bytes) {
     VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
-    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes) cannot be 0."));
+    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size cannot be 0."));
 
     const BOOL result = VirtualLock(ptr, num_bytes);
     VMEM_ERROR_IF(result == 0, vmem__write_win32_error_message());
@@ -592,7 +596,7 @@ VMEM_FUNC VMemResult vmem_unlock(void* ptr, const VMemSize num_bytes) {
 VMEM_FUNC VMemSize
 vmem_query_range_info(void* ptr, const VMemSize num_bytes, VMemRangeInfo* out_buf, const VMemSize buf_max_items) {
     VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
-    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes) cannot be 0."));
+    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size cannot be 0."));
     VMEM_ERROR_IF(out_buf == 0, vmem__write_error_message("Out buffer ptr cannot be null."));
     VMEM_ERROR_IF(buf_max_items == 0, vmem__write_error_message("Out buffer size cannot be 0."));
 
@@ -657,7 +661,7 @@ static void vmem__write_linux_error_message(void) {
 #endif
 
 VMEM_FUNC void* vmem_alloc_protect(const VMemSize num_bytes, const VMemProtect protect) {
-    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes) cannot be 0."));
+    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size cannot be 0."));
 
     const int prot = vmem__linux_protect(protect);
     if(prot) {
@@ -683,7 +687,7 @@ VMEM_FUNC VMemResult vmem_dealloc(void* ptr, const VMemSize num_allocated_bytes)
 
 VMEM_FUNC VMemResult vmem_commit_protect(void* ptr, const VMemSize num_bytes, const VMemProtect protect) {
     VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
-    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes) cannot be 0."));
+    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size cannot be 0."));
 
     // On linux the pages are created in a reserved state and automatically commited on the first write, so we don't
     // need to commit anything.
@@ -694,7 +698,7 @@ VMEM_FUNC VMemResult vmem_commit_protect(void* ptr, const VMemSize num_bytes, co
 
 VMEM_FUNC VMemResult vmem_decommit(void* ptr, const VMemSize num_bytes) {
     VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
-    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes) cannot be 0."));
+    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size cannot be 0."));
 
     const int result = madvise(ptr, num_bytes, MADV_DONTNEED);
     VMEM_ERROR_IF(result != 0, vmem__write_linux_error_message());
@@ -703,7 +707,7 @@ VMEM_FUNC VMemResult vmem_decommit(void* ptr, const VMemSize num_bytes) {
 
 VMEM_FUNC VMemResult vmem_protect(void* ptr, const VMemSize num_bytes, const VMemProtect protect) {
     VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
-    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes) cannot be 0."));
+    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size cannot be 0."));
 
     const int result = mprotect(ptr, num_bytes, vmem__linux_protect(protect));
     VMEM_ERROR_IF(result != 0, vmem__write_linux_error_message());
@@ -728,7 +732,7 @@ VMEM_FUNC VMemUsageStatus vmem_query_usage_status(void) {
 
 VMEM_FUNC VMemResult vmem_lock(void* ptr, const VMemSize num_bytes) {
     VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
-    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes) cannot be 0."));
+    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size cannot be 0."));
 
     const int result = mlock(ptr, num_bytes);
     VMEM_ERROR_IF(result != 0, vmem__write_linux_error_message());
@@ -737,7 +741,7 @@ VMEM_FUNC VMemResult vmem_lock(void* ptr, const VMemSize num_bytes) {
 
 VMEM_FUNC VMemResult vmem_unlock(void* ptr, const VMemSize num_bytes) {
     VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
-    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes) cannot be 0."));
+    VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size cannot be 0."));
 
     const int result = munlock(ptr, num_bytes);
     VMEM_ERROR_IF(result != 0, vmem__write_linux_error_message());
@@ -758,7 +762,22 @@ vmem_query_range_info(void* ptr, VMemSize num_bytes, VMemRangeInfo* out_buf, VMe
 // Arena implementation
 //
 
-VMEM_FUNC VMemArena vmem_arena_alloc(VMemSize size_bytes) {
+VMEM_FUNC VMemArena vmem_arena_init(void* mem, const VMemSize size_bytes) {
+    if(!vmem_is_aligned((uintptr_t)mem, vmem_get_page_size())) {
+        vmem__write_error_message("Arena must be aligned to page size.");
+        return (VMemArena){0};
+    }
+    if(size_bytes == 0) {
+        vmem__write_error_message("Size cannot be 0.");
+        return (VMemArena){0};
+    }
+    VMemArena arena = {0};
+    arena.mem = (uint8_t*)mem;
+    arena.size_bytes = size_bytes;
+    return arena;
+}
+
+VMEM_FUNC VMemArena vmem_arena_init_alloc(VMemSize size_bytes) {
     if(size_bytes == 0) {
         vmem__write_error_message("Arena size cannot be zero.");
         return (VMemArena){0};
@@ -769,41 +788,46 @@ VMEM_FUNC VMemArena vmem_arena_alloc(VMemSize size_bytes) {
     return arena;
 }
 
-VMEM_FUNC VMemResult vmem_arena_dealloc(VMemArena* arena) {
+VMEM_FUNC VMemResult vmem_arena_deinit_dealloc(VMemArena* arena) {
     VMEM_ERROR_IF(arena == 0, vmem__write_error_message("Arena pointer is null."));
     const VMemResult result = vmem_dealloc(arena->mem, arena->size_bytes);
     arena->mem = 0;
     return result;
 }
 
-VMEM_FUNC VMemResult vmem_arena_set_commited(VMemArena* arena, const VMemSize commited) {
-    if(commited == arena->commited) return VMemResult_Success;
+VMEM_FUNC VMemResult
+vmem_partially_commit_region(void* ptr, VMemSize num_bytes, VMemSize prev_commited, VMemSize commited) {
+    if(commited == prev_commited) return VMemResult_Success;
+
+    // If you hit this, you likely either didn't alloc enough space up-front,
+    // or have a leak that is allocating too many elements
+    VMEM_ERROR_IF(commited > num_bytes, vmem__write_error_message("Cannot commit more memory than is available."));
 
     const VMemSize new_commited_bytes = vmem_arena_calc_bytes_used_for_size(commited);
-    const VMemSize current_commited_bytes = vmem_arena_calc_bytes_used_for_size(arena->commited);
+    const VMemSize current_commited_bytes = vmem_arena_calc_bytes_used_for_size(prev_commited);
+
+    if(new_commited_bytes == current_commited_bytes) return VMemResult_Success;
 
     // Shrink
-    if(commited < arena->commited) {
-        if(new_commited_bytes < current_commited_bytes) {
-            const VMemSize bytes_to_dealloc =
-                (VMemSize)((intptr_t)current_commited_bytes - (intptr_t)new_commited_bytes);
-            vmem_decommit(arena->mem + new_commited_bytes, bytes_to_dealloc);
-        }
+    if(new_commited_bytes < current_commited_bytes) {
+        const VMemSize bytes_to_decommit = (VMemSize)((intptr_t)current_commited_bytes - (intptr_t)new_commited_bytes);
+        return vmem_decommit((void*)((uintptr_t)ptr + new_commited_bytes), bytes_to_decommit);
     }
     // Expand
-    else {
-        // If you hit this, you likely either didn't alloc enough space up-front,
-        // or have a leak that is allocating too many elements
-        VMEM_ERROR_IF(
-            commited > arena->size_bytes, vmem__write_error_message("You've used up all the memory available."));
-
-        if(current_commited_bytes < new_commited_bytes) {
-            vmem_commit(arena->mem, new_commited_bytes);
-        }
+    if(new_commited_bytes > current_commited_bytes) {
+        return vmem_commit(ptr, new_commited_bytes);
     }
 
-    arena->commited = commited;
     return VMemResult_Success;
+}
+
+VMEM_FUNC VMemResult vmem_arena_set_commited(VMemArena* arena, const VMemSize commited) {
+    VMEM_ERROR_IF(arena == 0, vmem__write_error_message("Arena pointer is null."));
+    if(vmem_partially_commit_region(arena->mem, arena->size_bytes, arena->commited, commited) == VMemResult_Success) {
+        arena->commited = commited;
+        return VMemResult_Success;
+    }
+    return VMemResult_Error;
 }
 
 #if defined(__cplusplus)

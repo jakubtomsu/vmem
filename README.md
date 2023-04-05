@@ -1,9 +1,6 @@
 # 💾 vmem.h
 A simple [STB-style](https://github.com/nothings/stb/blob/master/docs/stb_howto.txt) cross-platform C/C++ library for managing virtual memory.
 
-### Other libs
-[arena.h](#arenah) - Implementation of arena allocator on top of `vmem.h`.
-
 ## Usage
 Define `VMEM_IMPLEMENTATION` in only *one* C or C++ source file before including `vmem.h` to create the implementation.
 
@@ -87,13 +84,16 @@ int main() {
 ------- | -----------
 VMEM_IMPLEMENTATION       | Instantiate the library implementation in the current source file.
 VMEM_FUNC                 | Specifiers for all API functions. E.g. you can mark all functions static with `#define VMEM_FUNC static`
+VMEM_INLINE               | Inline qualifier for short static functions defined in the header. Defined to platform-specific inline or forceinline specifier.
 VMEM_ON_ERROR(opt_string) | Called when an error is encountered. By default this just calls `assert(0)`. You can disable it with `#define VMEM_ON_ERROR(opt_string)`.
 VMEM_NO_ERROR_MESSAGES    | Disables all error messages. When you call `vmem_get_error_message` it gives you just `<Error messages disabled>`.
 VMEM_NO_ERROR_CHECKING    | Completely disables ***all*** error checking. This might be very unsafe.
 
 
-
-# 📦 arena.h
-A simple arena allocator implemented using `vmem.h`.
-
-WIP
+## Language support
+- C99
+- C11
+- C++11
+- C++14
+- C++17
+- C++20

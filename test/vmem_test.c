@@ -39,6 +39,16 @@ UTEST(vmem, error_messages) {
 
     EXPECT_ERROR_WITH_VMEM_MSG(vmem_align_backward(123, 0));
     EXPECT_ERROR_WITH_VMEM_MSG(vmem_align_backward(123, 3));
+
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_is_aligned(3, 4));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_is_aligned(25, 4));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_is_aligned(0, 0));
+
+    VMemRangeInfo range_info = {0};
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_query_range_info(0, 0, 0, 0));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_query_range_info((void*)1, 0, 0, 0));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_query_range_info((void*)1, 1, 0, 0));
+    EXPECT_ERROR_WITH_VMEM_MSG(vmem_query_range_info((void*)1, 1, &range_info, 0));
 }
 
 UTEST(vmem, common) {
@@ -51,6 +61,14 @@ UTEST(vmem, common) {
     EXPECT_TRUE(vmem_commit(ptr, size));
 
     ASSERT_TRUE(vmem_dealloc(ptr, size));
+}
+
+UTEST(vmem, is_aligned) {
+    ASSERT_TRUE(vmem_is_aligned(8, 4) == 1);
+    ASSERT_TRUE(vmem_is_aligned(3, 4) == 0);
+    ASSERT_TRUE(vmem_is_aligned(25, 4) == 0);
+    ASSERT_TRUE(vmem_is_aligned(0, 4) == 1);
+    ASSERT_TRUE(vmem_is_aligned(0, 0) == 0);
 }
 
 UTEST(vmem, protect_func) {
@@ -172,246 +190,65 @@ UTEST(vmem, arena_common) {
     ASSERT_FALSE(vmem_arena_is_valid(&arena));
 }
 
-/*
-#include <stdint.h>
-#include <stdio.h>
-#include <assert.h
-
-#define SIZE (1024 * 512) // 0.5MB
-
-#define PRINT_JUST_SHORT_INFO 1
-
-#if defined(VMEM_PLATFORM_WIN32)
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-
-static const char* protect_mode_name_win32(const ULONG protect) {
-    switch(protect) {
-        case 0: return "<Can't access>";
-        case PAGE_NOACCESS: return "NOACCESS";
-        case PAGE_EXECUTE: return "EXECUTE";
-        case PAGE_READONLY: return "READONLY";
-        case PAGE_READWRITE: return "READWRITE";
-        case PAGE_GUARD: return "GUARD";
-        case PAGE_NOCACHE: return "NOCACHE";
-        case PAGE_WRITECOMBINE: return "WRITECOMBINE";
-    }
-    return "<Unknown>";
+UTEST(vmem, usage_status) {
+    VMemUsageStatus status = vmem_query_usage_status();
+    ASSERT_GT(status.total_physical_bytes, 0);
+    ASSERT_GT(status.avail_physical_bytes, 0);
+    printf(
+        "VMemUsageStatus { total_physical_bytes: %zu, avail_physical_bytes %zu }\n",
+        status.total_physical_bytes,
+        status.avail_physical_bytes);
+    printf("Total: %iGB\n", (int)((status.total_physical_bytes) / (1024 * 1024 * 1024)));
 }
 
-// Print allocation regions and page states.
-static void print_allocation_info_win32(void* ptr, const size_t num_bytes_to_scan) {
-    printf("[print_allocation_info_win32] Win32 VirtualQuery info for %p\n", ptr);
+UTEST(vmem, range_info) {
+    size_t size = 1024 * 1024;
+    void* ptr = vmem_alloc_protect(size, VMemProtect_NoAccess);
+    ASSERT_TRUE(ptr);
 
-    static char overview[1024 * 8] = {};
-    int overview_len = 0;
+    VMemRangeInfo info_buf[256] = {};
 
-    for(size_t i = 0; i < num_bytes_to_scan;) {
-        static MEMORY_BASIC_INFORMATION info = {};
+    {
+        VMemSize info_len = vmem_query_range_info(ptr, size, &info_buf[0], 256);
+        ASSERT_EQ(info_len, 1);
 
-        void* p = (void*)((uintptr_t)ptr + i);
-        SIZE_T num_bytes = VirtualQuery(p, &info, sizeof(info));
-        assert(num_bytes != 0);
-
-        const char* state_str = "<Unknown>";
-        switch(info.State) {
-            case MEM_COMMIT: state_str = "COMMIT"; break;
-            case MEM_DEALLOC: state_str = "DEALLOC"; break;
-            case MEM_RESERVE: state_str = "RESERVE"; break;
-        }
-
-        const char* type_str = "<Unknown>";
-        switch(info.Type) {
-            case MEM_IMAGE: type_str = "IMAGE"; break;
-            case MEM_MAPPED: type_str = "MAPPED"; break;
-            case MEM_PRIVATE: type_str = "PRIVATE"; break;
-        }
-
-        const char* initial_protect_str = protect_mode_name_win32(info.AllocationProtect);
-        const char* protect_str = protect_mode_name_win32(info.Protect);
-
-        const int region_pages = info.RegionSize / vmem_get_page_size();
-
-#if PRINT_JUST_SHORT_INFO
-        VMEM_UNUSED(initial_protect_str);
-        // 'p' stands for pages
-        printf(
-            "\t\tOffs: %06llib (%04ip), Size: %06llib (%04ip), State: %10s, Protect: %16s, Type: %10s\n",
-            (intptr_t)info.BaseAddress - (intptr_t)ptr,
-            (int)(((intptr_t)info.BaseAddress - (intptr_t)ptr) / vmem_get_page_size()),
-            info.RegionSize,
-            region_pages,
-            state_str,
-            protect_str,
-            type_str);
-#else
-        printf(
-            "\tinfo at offset %llu bytes\n"
-            "\t\tBaseAddress:          %p (%lli bytes from start ptr)\n"
-            "\t\tAllocationBase:       %p\n"
-            "\t\tAllocationProtect:    %i (%s)\n"
-            "\t\tRegionSize:           %llu bytes (%i pages)\n"
-            "\t\tState:                %i (%s)\n"
-            "\t\tProtect:              %i (%s)\n"
-            "\t\tType:                 %i (%s)\n"
-            "\n",
-            i,
-            info.BaseAddress,
-            (intptr_t)info.BaseAddress - (intptr_t)ptr,
-            info.AllocationBase,
-            (int)info.AllocationProtect,
-            initial_protect_str,
-            info.RegionSize,
-            region_pages,
-            (int)info.State,
-            state_str,
-            (int)info.Protect,
-            protect_str,
-            (int)info.Type,
-            type_str);
-#endif
-
-        if(overview_len + region_pages < sizeof(overview)) {
-            char overview_char = '?';
-            switch(info.State) {
-                case MEM_COMMIT: overview_char = 'C'; break;
-                case MEM_DEALLOC: overview_char = 'F'; break;
-                case MEM_RESERVE: overview_char = 'r'; break;
-            }
-            for(int j = 0; j < region_pages; j++) {
-                overview[overview_len + j] = overview_char;
-            }
-            overview_len += region_pages;
-        }
-
-        i += info.RegionSize;
+        ASSERT_EQ(info_buf[0].ptr, ptr);
+        ASSERT_EQ(info_buf[0].size_bytes, size);
+        ASSERT_EQ(info_buf[0].is_commited, 0);
+        ASSERT_EQ(info_buf[0].protect, VMemProtect_NoAccess);
     }
 
-    if(overview_len < sizeof(overview)) {
-        overview[overview_len] = '\0';
-    } else {
-        overview[sizeof(overview) - 4] = '.';
-        overview[sizeof(overview) - 3] = '.';
-        overview[sizeof(overview) - 2] = '.';
-        overview[sizeof(overview) - 1] = '\0';
+    ASSERT_TRUE(vmem_commit_protect((void*)((uintptr_t)ptr + vmem_get_page_size()), 1, VMemProtect_Read));
+
+    {
+        VMemSize info_len = vmem_query_range_info(ptr, size, &info_buf[0], 256);
+        ASSERT_EQ(info_len, 3);
+
+        ASSERT_EQ(info_buf[0].ptr, ptr);
+        ASSERT_EQ(info_buf[0].size_bytes, vmem_get_page_size());
+        ASSERT_EQ(info_buf[0].is_commited, 0);
+        ASSERT_EQ(info_buf[0].protect, VMemProtect_NoAccess);
+
+        ASSERT_EQ(info_buf[1].ptr, (void*)((uintptr_t)ptr + vmem_get_page_size()));
+        ASSERT_EQ(info_buf[1].size_bytes, vmem_get_page_size());
+        ASSERT_EQ(info_buf[1].is_commited, 1);
+        ASSERT_EQ(info_buf[1].protect, VMemProtect_Read);
+
+        ASSERT_EQ(info_buf[2].ptr, (void*)((uintptr_t)ptr + vmem_get_page_size() * 2));
+        ASSERT_EQ(info_buf[2].size_bytes, size - vmem_get_page_size() * 2);
+        ASSERT_EQ(info_buf[2].is_commited, 0);
+        ASSERT_EQ(info_buf[2].protect, VMemProtect_NoAccess);
     }
 
-    printf("\tPage state overview: (C: commited, F: dealloc, r: reserved)\n\t\t%s\n", overview);
+    {
+        VMemSize info_len = vmem_query_range_info(ptr, vmem_get_page_size(), &info_buf[0], 256);
+        ASSERT_EQ(info_len, 1);
+
+        ASSERT_EQ(info_buf[0].ptr, ptr);
+        ASSERT_EQ(info_buf[0].size_bytes, vmem_get_page_size());
+        ASSERT_EQ(info_buf[0].is_commited, 0);
+        ASSERT_EQ(info_buf[0].protect, VMemProtect_NoAccess);
+    }
+
+    ASSERT_TRUE(vmem_dealloc(ptr, size));
 }
-#endif
-
-int main() {
-    assert(vmem_get_page_size() == vmem_query_page_size());
-
-    // Test align functions
-    printf("Test align functions...\n");
-    {
-        assert(vmem_align_forward(0, 8) == 0);
-        assert(vmem_align_forward(16, 8) == 16);
-        assert(vmem_align_forward(1, 8) == 8);
-        assert(vmem_align_forward(14, 8) == 16);
-        assert(vmem_align_forward(1, 1024) == 1024);
-
-        assert(vmem_align_backward(0, 8) == 0);
-        assert(vmem_align_backward(1, 8) == 0);
-        assert(vmem_align_backward(14, 8) == 8);
-        assert(vmem_align_backward(1, 1024) == 0);
-    }
-
-    const size_t page_size = vmem_get_page_size();
-
-    // Basic stuff
-    printf("Test basic...\n");
-    {
-        printf("Page size: %llu\n", page_size);
-
-        uint8_t* ptr = (uint8_t*)vmem_alloc(SIZE);
-        vmem_commit(ptr, page_size * 2);
-        for(int i = 0; i < page_size * 2; i++) {
-            ptr[i] = 0xfa;
-        }
-
-        vmem_decommit(ptr, page_size);
-
-        for(int i = page_size; i < page_size * 2; i++) {
-            ptr[i] = 0xff;
-        }
-
-        vmem_dealloc(ptr, SIZE);
-    }
-
-    // Windows query virtual memory info
-#if defined(VMEM_PLATFORM_WIN32)
-    {
-        uint8_t* ptr = (uint8_t*)vmem_alloc(SIZE);
-
-        print_allocation_info_win32(ptr, SIZE);
-
-        vmem_commit(ptr, vmem_get_page_size() * 4);
-
-        print_allocation_info_win32(ptr, SIZE);
-
-        for(int i = 0; i < 20; i++) {
-            vmem_commit(ptr + i * vmem_get_page_size() * 2, 1);
-        }
-
-        print_allocation_info_win32(ptr, SIZE);
-
-        vmem_dealloc(ptr, SIZE);
-    }
-#endif
-
-    // Locking/unlocking
-    {
-        void* ptr = vmem_alloc(SIZE);
-
-        vmem_commit(ptr, SIZE);
-        vmem_lock(ptr, SIZE);
-        vmem_unlock(ptr, SIZE);
-
-        vmem_dealloc(ptr, SIZE);
-    }
-
-    // Protection
-    {
-        uint64_t* ptr = (uint64_t*)vmem_alloc_protect(SIZE, VMemProtect_NoAccess);
-
-        vmem_commit_protect(ptr, SIZE, VMemProtect_ReadWrite);
-
-        for(int i = 0; i < 200; i++) {
-            ptr[i] = i;
-        }
-
-        vmem_set_protect(ptr, SIZE, VMemProtect_Read);
-
-        for(int i = 0; i < 200; i++) {
-            printf("%llx ", ptr[i]);
-        }
-        printf("\n");
-
-        vmem_dealloc(ptr, SIZE);
-    }
-
-    // Huge allocation
-    {
-        // 100TB
-        const size_t size = 1024LLU * 1024LLU * 1024LLU * 1024LLU * 100LLU;
-        printf(
-            "Huge allocation size: %llu bytes (%lluGB, %lluTB)\n",
-            size,
-            size / (1024LLU * 1024LLU * 1024LLU),
-            size / (1024LLU * 1024LLU * 1024LLU * 1024LLU));
-        void* ptr = vmem_alloc(size);
-
-        vmem_commit(ptr, 1024 * 100);
-
-#if defined(VMEM_PLATFORM_WIN32)
-        print_allocation_info_win32(ptr, size);
-#endif
-
-        vmem_dealloc(ptr, size);
-    }
-
-    return 0;
-}
-*/

@@ -14,6 +14,8 @@
 //      #define VMEM_IMPLEMENTATION
 //      #include "vmem.h"
 //
+// And then call `vmem_init` once, at the start of your program.
+//
 // LICENSE
 //      See end of file for license information.
 //
@@ -89,18 +91,18 @@ typedef struct VMemUsageStatus {
 // Public API
 //
 
-// Call at the start of your program.
+// Call once at the start of your program.
 // This exists only to cache result of `vmem_query_page_size` so you can use faster `vmem_get_page_size`,
 // so this is completely optional. If you don't call this `vmem_get_page_size` will return 0.
 // There isn't any deinit/shutdown code.
 VMEM_FUNC void vmem_init(void);
 
-// Reserves (allocates but doesn't commit) a block of virtual address-space of size `num_bytes`.
+// Reserve (allocate but don't commit) a block of virtual address-space of size `num_bytes`.
 // @returns 0 on error, start address of the allocated memory block on success.
 VMEM_FUNC void* vmem_alloc_protect(VMemSize num_bytes, VMemProtect protect);
 
-// Deallocs (releases) a block of virtual memory.
-// @param alloc_ptr: a pointer to the start of the memory block. Result of `vmem_alloc`.
+// Dealloc (release, free) a block of virtual memory.
+// @param alloc_ptr: a pointer to the start of the memory block. Must be the result of `vmem_alloc`.
 // @param num_allocated_bytes: *must* be the value returned by `vmem_alloc`.
 //  It isn't used on windows, but it's required on unix platforms.
 VMEM_FUNC VMemResult vmem_dealloc(void* alloc_ptr, VMemSize num_allocated_bytes);
@@ -109,8 +111,6 @@ VMEM_FUNC VMemResult vmem_dealloc(void* alloc_ptr, VMemSize num_allocated_bytes)
 // memory.
 // Decommit with `vmem_decommit`.
 // @param ptr: pointer to the pointer returned by `vmem_alloc` or shifted by [0...num_bytes].
-// @param num_bytes: number of bytes to commit.
-// @param protect: protection mode for the newly commited pages.
 VMEM_FUNC VMemResult vmem_commit_protect(void* ptr, VMemSize num_bytes, VMemProtect protect);
 
 // Decommits the memory pages which contain one or more bytes in [ptr...ptr+num_bytes]. The pages will be unmapped from
@@ -171,7 +171,7 @@ static VMEM_INLINE void* vmem_alloc_commited(const VMemSize num_bytes) {
 // Commit memory pages which contain one or more bytes in [ptr...ptr+num_bytes]. The pages will be mapped to physical
 // memory. The page protection mode will be changed to ReadWrite. Use `vmem_commit_protect` to specify a different mode.
 // Decommit with `vmem_decommit`.
-// @param ptr: pointer to the pointer returned by `vmem_alloc` or shifted by [0...num_bytes].
+// @param ptr: pointer to the pointer returned by `vmem_alloc` or shifted by N.
 // @param num_bytes: number of bytes to commit.
 static VMEM_INLINE VMemResult vmem_commit(void* ptr, const VMemSize num_bytes) {
     return vmem_commit_protect(ptr, num_bytes, VMemProtect_ReadWrite);
@@ -186,13 +186,11 @@ VMEM_FUNC const char* vmem_get_error_message(void);
 VMEM_FUNC const char* vmem_get_protect_name(VMemProtect protect);
 
 // Round the `address` up to the next (or current) aligned address.
-// @param address: Memory address to align.
 // @param align: Address alignment. Must be a power of 2 and greater than 0.
 // @returns aligned address on success, VMemResult_Error on error.
 VMEM_FUNC uintptr_t vmem_align_forward(const uintptr_t address, const int align);
 
 // Round the `address` down to the previous (or current) aligned address.
-// @param address: Memory address to align.
 // @param align: Address alignment. Must be a power of 2 and greater than 0.
 // @returns aligned address on success, VMemResult_Error on error.
 VMEM_FUNC uintptr_t vmem_align_backward(const uintptr_t address, const int align);
@@ -243,7 +241,8 @@ VMEM_FUNC VMemResult vmem_arena_set_commited(VMemArena* arena, VMemSize commited
 
 // Initialize the arena with an existing memory block, which you manage on your own.
 // Note: when using this, use `vmem_dealloc` on your own, don't call `vmem_arena_dealloc`!
-// @param mem: pointer returned by `vmem_alloc`.
+// @param mem: pointer returned by `vmem_alloc`, or shifted by N bytes (you can sub-allocate one memory allocation).
+// @param size_bytes: size of the arena in bytes.
 static VMEM_INLINE VMemArena vmem_arena_init(void* mem, VMemSize size_bytes) {
     VMemArena arena = {0};
     arena.mem = (uint8_t*)mem;
@@ -251,6 +250,7 @@ static VMEM_INLINE VMemArena vmem_arena_init(void* mem, VMemSize size_bytes) {
     return arena;
 }
 
+// @returns true if the arena is valid (it was initialized with valid memory and size).
 static VMEM_INLINE VMemResult vmem_arena_is_valid(const VMemArena* arena) {
     if(arena) {
         return arena->mem != 0 && arena->size_bytes > 0;
@@ -258,6 +258,7 @@ static VMEM_INLINE VMemResult vmem_arena_is_valid(const VMemArena* arena) {
     return VMemResult_Error;
 }
 
+// @returns number of bytes which are physically used for a given size bytes (or commited bytes).
 static VMEM_INLINE VMemSize vmem_arena_calc_bytes_used_for_size(const VMemSize size_bytes) {
     return vmem_align_forward(size_bytes, vmem_get_page_size());
 }
@@ -266,13 +267,20 @@ static VMEM_INLINE VMemSize vmem_arena_calc_bytes_used_for_size(const VMemSize s
 // Virtual memory range debug info
 //
 
+// Debug info about a range of virtual memory pages.
 typedef struct VMemRangeInfo {
+    // Base address of the range.
     void* ptr;
+    // Number of bytes in the range. Multiple of page size.
     VMemSize size_bytes;
     uint8_t is_commited;
     VMemProtect protect;
 } VMemRangeInfo;
 
+// Query info about a state of pages in range [ptr...ptr+num_bytes].
+// @param out_buf: array of `VmemRangeInfo` of size `buf_max_items`. This will contain the query results.
+// @param buf_max_items: `out_buf` array length.
+// @returns number of entries written to `out_buf`, or 0 on failure.
 VMEM_FUNC VMemSize vmem_query_range_info(void* ptr, VMemSize num_bytes, VMemRangeInfo* out_buf, VMemSize buf_max_items);
 
 #if defined(__cplusplus)
@@ -582,7 +590,7 @@ VMEM_FUNC VMemResult vmem_unlock(void* ptr, const VMemSize num_bytes) {
 }
 
 VMEM_FUNC VMemSize
-vmem_query_range_info(void* ptr, VMemSize num_bytes, VMemRangeInfo* out_buf, VMemSize buf_max_items) {
+vmem_query_range_info(void* ptr, const VMemSize num_bytes, VMemRangeInfo* out_buf, const VMemSize buf_max_items) {
     VMEM_ERROR_IF(ptr == 0, vmem__write_error_message("Ptr cannot be null."));
     VMEM_ERROR_IF(num_bytes == 0, vmem__write_error_message("Size (num_bytes) cannot be 0."));
     VMEM_ERROR_IF(out_buf == 0, vmem__write_error_message("Out buffer ptr cannot be null."));
@@ -735,6 +743,13 @@ VMEM_FUNC VMemResult vmem_unlock(void* ptr, const VMemSize num_bytes) {
     VMEM_ERROR_IF(result != 0, vmem__write_linux_error_message());
     return VMemResult_Success;
 }
+
+VMEM_FUNC VMemSize
+vmem_query_range_info(void* ptr, VMemSize num_bytes, VMemRangeInfo* out_buf, VMemSize buf_max_items) {
+    vmem__write_error_message("Currently not supported on Linux.");
+    return 0;
+}
+
 #endif // defined(VMEM_PLATFORM_LINUX)
 
 
@@ -746,7 +761,7 @@ VMEM_FUNC VMemResult vmem_unlock(void* ptr, const VMemSize num_bytes) {
 VMEM_FUNC VMemArena vmem_arena_alloc(VMemSize size_bytes) {
     if(size_bytes == 0) {
         vmem__write_error_message("Arena size cannot be zero.");
-        return {0};
+        return (VMemArena){0};
     }
     VMemArena arena = {0};
     arena.mem = (uint8_t*)vmem_alloc(size_bytes);

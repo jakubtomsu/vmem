@@ -1,4 +1,4 @@
-# 💾 vmem.h
+# 💾 vmem.h 0.2
 A simple [STB-style](https://github.com/nothings/stb/blob/master/docs/stb_howto.txt) cross-platform C/C++ library for managing virtual memory.
 
 ## Usage
@@ -51,6 +51,8 @@ There are zero dependencies apart from the C standard library.
 ## Arena
 Arena is a bump allocator on a linear block of memory.
 When working with virtual memory, only the used part of the arena stays commited.
+
+You can read more about advantages of arenas in [this blog post by Ryan Fleury](https://www.rfleury.com/p/untangling-lifetimes-the-arena-allocator).
 
 Example usage:
 ```c

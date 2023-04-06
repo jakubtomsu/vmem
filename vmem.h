@@ -1,37 +1,52 @@
-// vmem.h - v0.1 - public domain
+// vmem.h - v0.2 - public domain
 // no warranty implied; use at your own risk.
 //
 // The latest version of this library is available on GitHub:
 // https://github.com/jakubtomsu/vmem
 //
-// Do this:
-//    #define VMEM_IMPLEMENTATION
-// before you include this file in *one* C or C++ file to create the implementation.
+// Usage:
+//      do `#define VMEM_IMPLEMENTATION` in only *one* C or C++ source file before including `vmem.h` to create the
+//      implementation.
 //
-// i.e. it should look like this:
-//      #include ...
-//      #include ...
-//      #define VMEM_IMPLEMENTATION
-//      #include "vmem.h"
+//      i.e. it should look like this:
+//           #include ...
+//           #define VMEM_IMPLEMENTATION
+//           #include "vmem.h"
+//           #include ...
 //
-// And then call `vmem_init` once, at the start of your program.
+//      And then call `vmem_init` once, at the start of your program.
 //
-// LICENSE
+// License:
 //      See end of file for license information.
 //
-// Compile-time options
+// Compile-time options:
 //      VMEM_IMPLEMENTATION
 //          Instantiate the library implementation in the current source file.
 //      VMEM_FUNC
 //          Specifiers for all API functions. E.g. you can mark all functions static with `#define VMEM_FUNC static`
-//      VMEM_ON_ERROR(opt_string)
-//          Called when an error is encountered. By default this just calls `assert(0)`. You can disable it with
-//          `#define VMEM_ON_ERROR(opt_string)`.
+//      VMEM_INLINE
+//          Inline qualifier for short static functions defined in the header. Defined to platform-specific inline or
+//          forceinline specifier.
+//      VMEM_ON_ERROR
+//          t_string) | Called when an error is encountered. By default this just calls `assert(0)`. You can disable it
+//          with `#define VMEM_ON_ERROR(opt_string)`.
 //      VMEM_NO_ERROR_MESSAGES
 //          Disables all error messages. When you call `vmem_get_error_message` it gives you just `<Error messages
 //          disabled>`.
 //      VMEM_NO_ERROR_CHECKING
 //          Completely disables ***all*** error checking. This might be very unsafe.
+//
+// Supported platforms:
+//      Windows
+//      Linux
+//
+// Features:
+//      Reserving, committing, decommiting and releasing memory
+//      Page protection levels
+//      Querying page size and allocation granularity
+//      Memory usage status (total physical memory, available physical memory)
+//      Address math utilities - aligning forwards, backwards, checking alignment
+//      Arena allocation
 
 #if !defined(VMEM_H_INCLUDED)
 #define VMEM_H_INCLUDED
@@ -63,7 +78,7 @@ extern "C" {
 typedef size_t VMemSize;
 typedef uint8_t VMemProtect;
 // Success/Error result (VMemResult_).
-// You can use this in an if statement: if(vmem_commit(...)) { do something... }
+// You can use this as a bool in an if statement: if(vmem_commit(...)) { do something... }
 typedef int VMemResult;
 
 typedef enum VMemResult_ {
@@ -82,6 +97,7 @@ typedef enum VMemProtect_ {
     VMemProtect_COUNT,
 } VMemProtect_;
 
+// Global memory status.
 typedef struct VMemUsageStatus {
     VMemSize total_physical_bytes;
     VMemSize avail_physical_bytes;
@@ -94,7 +110,7 @@ typedef struct VMemUsageStatus {
 // Call once at the start of your program.
 // This exists only to cache result of `vmem_query_page_size` so you can use faster `vmem_get_page_size`,
 // so this is completely optional. If you don't call this `vmem_get_page_size` will return 0.
-// There isn't any deinit/shutdown code.
+// Currently there isn't any deinit/shutdown code.
 VMEM_FUNC void vmem_init(void);
 
 // Reserve (allocate but don't commit) a block of virtual address-space of size `num_bytes`.
@@ -122,14 +138,14 @@ VMEM_FUNC VMemResult vmem_decommit(void* ptr, VMemSize num_bytes);
 // Sets protection mode for the region of pages. All of the pages must be commited.
 VMEM_FUNC VMemResult vmem_protect(void* ptr, VMemSize num_bytes, VMemProtect protect);
 
-// @returns cached value from `vmem_query_page_size`
+// @returns cached value from `vmem_query_page_size`. Returns 0 if you don't call `vmem_init`.
 VMEM_FUNC VMemSize vmem_get_page_size(void);
 
 // Query the page size from the system. Usually something like 4096 bytes.
 // @returns the page size in number bytes. Cannot fail.
 VMEM_FUNC VMemSize vmem_query_page_size(void);
 
-// @returns cached value from `vmem_query_allocation_granularity`
+// @returns cached value from `vmem_query_allocation_granularity`. Returns 0 if you don't call `vmem_init`.
 VMEM_FUNC VMemSize vmem_get_allocation_granularity(void);
 
 // Query the allocation granularity (alignment of each allocation) from the system.
@@ -215,7 +231,7 @@ static inline VMemResult vmem_is_aligned_fast(const uintptr_t address, const int
     return (address & (align - 1)) == 0;
 }
 
-// Commit a specific number of bytes from the region.
+// Commit a specific number of bytes from the region. This can be used for a custom arena allocator.
 // If `commited < prev_commited`, this will shrink the usable range.
 // If `commited > prev_commited`, this will expand the usable range.
 VMEM_FUNC VMemResult

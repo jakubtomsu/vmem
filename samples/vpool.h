@@ -1,9 +1,9 @@
 #pragma once
-#include "vmem.h"
+#include "../vmem.h"
 
 template<typename INDEX, typename T>
 struct VPool {
-    static_assert(sizeof(T) >= sizeof(INDEX));
+    static_assert(sizeof(T) >= sizeof(INDEX), "T has to be at least as large as INDEX");
     static constexpr INDEX INVALID_INDEX = (INDEX)-1;
 
     VMemArena arena = {};

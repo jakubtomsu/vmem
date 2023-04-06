@@ -1,5 +1,5 @@
 #pragma once
-#include "vmem.h"
+#include "../vmem.h"
 
 template<typename T>
 struct VArray {
@@ -18,6 +18,10 @@ struct VArray {
         vmem_arena_deinit_dealloc(&arena);
     }
 
+    bool is_valid() {
+        return vmem_arena_is_valid(&arena);
+    }
+
     inline bool is_in_bounds(const int index) {
         return index >= 0 && index <= len;
     }
@@ -26,11 +30,11 @@ struct VArray {
         return (T*)arena.mem;
     }
 
-    T& get(const int index) {
+    T get(const int index) {
         if(is_in_bounds(index)) {
             return get_items()[index];
         }
-        return {};
+        return T();
     }
 
     bool try_get(const int index, T& out_value) {
@@ -43,7 +47,7 @@ struct VArray {
 
     int put(const T& value) {
         vmem_arena_set_commited(&arena, len + 1);
-        const int index = 0;
+        const int index = len;
         len += 1;
         get_items()[index] = value;
         return index;
@@ -54,7 +58,7 @@ struct VArray {
             len -= 1;
             const int last = len;
             T* items = get_items();
-            items[index] = items[index];
+            items[index] = items[last];
         }
     }
 };

@@ -268,7 +268,7 @@ static VMEM_INLINE VMemSize vmem_arena_calc_bytes_used_for_size(const VMemSize s
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Virtual memory range debug info
+// Virtual memory debug info
 //
 
 // Debug info about a range of virtual memory pages.

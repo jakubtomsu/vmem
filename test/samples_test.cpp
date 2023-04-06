@@ -4,8 +4,8 @@
 
 #include "utest.h"
 
-#define VPOOL_IMPLEMENTATION
-#include "../vpool.h"
+#include "../samples/vpool.h"
+#include "../samples/varray.h"
 #include <stdio.h>
 
 UTEST(vpool, common) {
@@ -42,6 +42,26 @@ UTEST(vpool, init_vmem) {
     p.init(ptr, size);
     ASSERT_TRUE(p.is_valid());
     vmem_dealloc(ptr, size);
+}
+
+UTEST(varray, common) {
+    VArray<float> arr = {};
+    arr.init_alloc(1024 * 32);
+    ASSERT_TRUE(arr.is_valid());
+
+    arr.put(1.0f);
+    arr.put(1.5f);
+    arr.put(2.0f);
+    ASSERT_EQ(arr.get(0), 1.0f);
+    ASSERT_EQ(arr.get(1), 1.5f);
+    ASSERT_EQ(arr.get(2), 2.0f);
+
+    arr.swap_remove(1);
+    ASSERT_EQ(arr.get(0), 1.0f);
+    ASSERT_EQ(arr.get(1), 2.0f);
+
+    arr.deinit_dealloc();
+    ASSERT_FALSE(arr.is_valid());
 }
 
 UTEST_STATE();

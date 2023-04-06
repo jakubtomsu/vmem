@@ -1,3 +1,6 @@
+#define VMEM_ON_ERROR(opt_string) // Ignore for tests
+#define VMEM_IMPLEMENTATION
+#include "../vmem.h"
 #include "utest.h"
 #include <stdio.h>
 
@@ -251,4 +254,11 @@ UTEST(vmem, range_info) {
     }
 
     ASSERT_TRUE(vmem_dealloc(ptr, size));
+}
+
+UTEST_STATE();
+
+int main(const int argc, const char* argv[]) {
+    vmem_init();
+    return utest_main(argc, argv);
 }

@@ -30,6 +30,14 @@ vmem_commit(ptr, 2048);
 vmem_dealloc(ptr, size);
 ```
 
+## Features
+- Reserving, committing, decommiting and releasing memory
+- Page protection levels
+- Querying page size and allocation granularity
+- Memory usage status (total physical memory, available physical memory)
+- Address math utilities - aligning forwards, backwards, checking alignment
+- Arena allocation, see [Arena](#arena)
+
 ## Supported platforms
 - Windows
 - Linux
@@ -40,8 +48,30 @@ Game consoles aren't supported, you will need to implement the platform backends
 ## Dependencies
 There are zero dependencies apart from the C standard library.
 
+## Arena
+Arena is a bump allocator on a linear block of memory.
+When working with virtual memory, only the used part of the arena stays commited.
+
+Example usage:
+```c
+VMemArena arena = vmem_arena_init_alloc(1024 * 1024); // Allocate an arena.
+vmem_arena_set_commited(&arena, 32 * sizeof(int); // Commit part of the arena.
+for(int i = 0; i < 32; i++) {
+    *(int*)arena.mem = i;
+}
+vmem_arena_deinit_dealloc(&arena); // Free the arena memory.
+```
+
+## Samples
+The [samples/](samples/) folder contains a number of containers built using arena allocation.
+
+Note: currently the samples are mostly WIP, there will be more in the future.
+
+Tests for the samples are in [tests/samples_test.cpp](tests/samples_test.cpp)
+
 ## Tests
 Tests use the [utest.h](https://github.com/sheredom/utest.h) library.
+You can find all the vmem.h tests in [tests/vmem_test.c](tests/vmem_test.c).
 
 ### Build tests
 ```bash

@@ -325,8 +325,6 @@ VMEM_FUNC VMemSize vmem_query_range_info(void* ptr, VMemSize num_bytes, VMemRang
 #if defined(VMEM_IMPLEMENTATION) && !defined(VMEM_H_IMPLEMENTED)
 #define VMEM_H_IMPLEMENTED
 
-#define _CRT_SECURE_NO_WARNINGS 1
-
 #if !defined(VMEM_UNUSED)
 #define VMEM_UNUSED(varible) (void)(varible)
 #endif

@@ -52,7 +52,7 @@
 #define VMEM_H_INCLUDED
 
 #include <stdint.h>
-#include <stddef.h> // VMemSize
+#include <stddef.h> // size_t
 
 #if !defined(VMEM_FUNC)
 #define VMEM_FUNC

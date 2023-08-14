@@ -181,7 +181,7 @@ UTEST(vmem, overlapped_page) {
 }
 
 UTEST(vmem, arena_common) {
-    VMemArena arena = {};
+    VMemArena arena = {0};
     ASSERT_FALSE(vmem_arena_is_valid(&arena));
     arena = vmem_arena_init_alloc(1024 * 1024);
     ASSERT_TRUE(vmem_arena_is_valid(&arena));
@@ -209,7 +209,7 @@ UTEST(vmem, range_info) {
     void* ptr = vmem_alloc_protect(size, VMemProtect_NoAccess);
     ASSERT_TRUE(ptr);
 
-    VMemRangeInfo info_buf[256] = {};
+    VMemRangeInfo info_buf[256] = {0};
 
     {
         VMemSize info_len = vmem_query_range_info(ptr, size, &info_buf[0], 256);

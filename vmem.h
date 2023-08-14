@@ -410,7 +410,7 @@ VMEM_FUNC VMemSize vmem_get_allocation_granularity(void) {
 }
 
 #if !defined(VMEM_NO_ERROR_MESSAGES)
-VMEM_THREAD_LOCAL char vmem__g_error_message[1024] = {};
+VMEM_THREAD_LOCAL char vmem__g_error_message[1024] = {0};
 
 static void vmem__write_error_message(const char* str) {
     int i = 0;
@@ -567,13 +567,13 @@ VMEM_FUNC VMemResult vmem_protect(void* ptr, const VMemSize num_bytes, const VMe
 }
 
 VMEM_FUNC VMemSize vmem_query_page_size(void) {
-    SYSTEM_INFO system_info = {};
+    SYSTEM_INFO system_info = {0};
     GetSystemInfo(&system_info);
     return system_info.dwPageSize;
 }
 
 VMEM_FUNC VMemSize vmem_query_allocation_granularity(void) {
-    SYSTEM_INFO system_info = {};
+    SYSTEM_INFO system_info = {0};
     GetSystemInfo(&system_info);
     return system_info.dwAllocationGranularity;
 }
